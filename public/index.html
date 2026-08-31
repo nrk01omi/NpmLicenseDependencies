@@ -12,11 +12,14 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif; }
-  header { background: #111827; color: #fff; padding: 12px 20px; display: flex; align-items: baseline; gap: 16px; }
+  header { background: #111827; color: #fff; padding: 8px 12px; display: flex; align-items: baseline; gap: 16px; }
   header h1 { font-size: 18px; margin: 0; font-weight: 600; }
   header span { color: #9ca3af; font-size: 12px; }
-  main { max-width: 1400px; margin: 0 auto; padding: 16px 20px 40px; display: grid; gap: 16px; }
-  section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  /* 表示幅は画面いっぱいに使う（最大幅の制限なし、余白は最小限） */
+  main { width: 100%; box-sizing: border-box; margin: 0; padding: 10px 10px 24px; display: grid; gap: 10px; }
+  /* グリッド内の要素は既定で内容幅まで広がる (min-width: auto) ため、表が広くても main が右に伸びないよう 0 にする。表は .tablewrap 内で横スクロール */
+  main > section { min-width: 0; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
   section h2 { font-size: 15px; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; }
   .field { display: grid; grid-template-columns: 140px 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; }
   .field label { color: var(--muted); }
@@ -79,6 +82,38 @@
   .speclink .ext { font-size: 12px; font-weight: 400; color: var(--muted); }
   .speclink p { margin: 0; color: var(--muted); font-size: 13px; }
   th[title] { cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  th small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; text-decoration: none; }
+  td .counts { font-size: 11px; color: var(--muted); white-space: nowrap; margin-top: 2px; }
+  td a.ext { text-decoration: none; font-size: 12px; margin-left: 4px; white-space: nowrap; }
+  td .sitecell { display: flex; align-items: flex-start; gap: 6px; }
+  td .parents { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 200px; max-width: 320px; overflow-wrap: anywhere; }
+  td.name .tree { color: #9ca3af; font-family: var(--mono); font-weight: 400; }
+  tr.dup td { color: var(--muted); background: #fafafa; }
+  tr.dup td.name { font-weight: 400; }
+  tr.dup .badge { opacity: .6; }
+  .toolbar .seg-label { color: var(--muted); font-size: 12px; margin-left: 6px; }
+  /* 機能番号 ①〜⑥（設定・列見出し・仕様ページで共通） */
+  .num { display: inline-block; background: #1f2937; color: #fff; border-radius: 4px; padding: 0 5px; margin-right: 4px; font-size: 12px; font-weight: 600; line-height: 18px; font-family: "Segoe UI", system-ui, sans-serif; }
+  th .num { vertical-align: 1px; }
+  .legend { font-size: 12px; color: var(--muted); margin: -4px 0 10px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+  .legend a { color: var(--text); text-decoration: none; white-space: nowrap; }
+  .legend a:hover { text-decoration: underline; }
+  .legend .muted { color: var(--muted); }
+  .group { border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 8px; }
+  .group h3 { font-size: 13px; margin: 0 0 6px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+  .group h3 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .badge.sev-critical, .badge.sev-high { background: var(--ng-bg); color: var(--ng); }
+  .badge.sev-moderate { background: var(--wait-bg); color: var(--wait); }
+  .badge.sev-low, .badge.sev-info { background: #e5e7eb; color: #374151; }
+  details.deps ul.vulns { columns: 1; margin: 6px 0 0; padding-left: 16px; font-size: 12px; min-width: 380px; max-width: 520px; }
+  details.deps ul.vulns li { margin: 3px 0; font-family: inherit; font-size: 12px; }
+  td .vulns .sev { font-family: var(--mono); font-size: 11px; margin-right: 4px; }
+  .counters .vv b { color: var(--ng); }
+  .progress.indeterminate > div { width: 30% !important; animation: slide 1.2s linear infinite; }
+  @keyframes slide { from { margin-left: -30%; } to { margin-left: 100%; } }
+  .dialog .summary { display: grid; grid-template-columns: auto auto; gap: 4px 16px; background: #f3f4f6; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
+  .dialog .summary b { font-size: 15px; }
+  .counters .mm b { color: var(--ng); }
   .empty { padding: 30px; text-align: center; color: var(--muted); }
   .saved { color: var(--muted); font-size: 12px; }
   input[type=number] { width: 60px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
@@ -94,7 +129,7 @@
   .dialog .detail dt:first-child { margin-top: 0; }
   .dialog .detail dd { margin: 0; word-break: break-all; }
   .dialog .choices { display: grid; gap: 8px; }
-  .dialog .choices button { text-align: left; padding: 10px 14px; display: grid; gap: 2px; }
+  .dialog .choices button { text-align: left; padding: 10px 14px; display: grid; gap: 2px; white-space: normal; width: 100%; min-width: 0; box-sizing: border-box; }
   .dialog .choices button b { font-size: 14px; }
   .dialog .choices button span { color: var(--muted); font-size: 12px; }
   .dialog .choices button.primary span { color: #dbeafe; }
@@ -115,39 +150,83 @@
 
   <section id="settings">
     <h2>1. 設定</h2>
-    <div class="field">
-      <label for="project">プロジェクトフォルダ</label>
-      <input type="text" id="project" placeholder="package.json のあるフォルダ（例: C:\Apps\monitor\OllamaProxy）">
-      <button id="browseProject">参照…</button>
+    <div class="legend">
+      機能番号: <a href="/spec#f1" target="nld-spec"><span class="num">①</span>基本取得</a>
+      <a href="/spec#f2" target="nld-spec"><span class="num">②</span>依存ライブラリ</a>
+      <a href="/spec#f3" target="nld-spec"><span class="num">③</span>取得済みライブラリ</a>
+      <a href="/spec#f4" target="nld-spec"><span class="num">④</span>npm サイト照合</a>
+      <a href="/spec#f5" target="nld-spec"><span class="num">⑤</span>再帰調査</a>
+      <a href="/spec#f6" target="nld-spec"><span class="num">⑥</span>脆弱性チェック</a>
+      <span class="muted">— 結果表の列見出しにも同じ番号が付きます。①だけで基本の CSV が出ます。②③は①に含まれ、④⑤⑥は任意です</span>
     </div>
-    <div class="field">
-      <label for="out">出力 CSV</label>
-      <input type="text" id="out" placeholder="未指定なら <プロジェクト>\npm-dependencies.csv">
-      <button id="browseOut">参照…</button>
+
+    <div class="group">
+      <h3><span class="num">①</span>基本取得 <small>ライブラリ名・バージョン・ライセンス・リポジトリを npm レジストリ API から取得（②依存ライブラリ・③取得済みライブラリも同時に出ます）</small></h3>
+      <div class="field">
+        <label for="project">プロジェクトフォルダ</label>
+        <input type="text" id="project" placeholder="package.json のあるフォルダ（例: C:\Apps\monitor\OllamaProxy）">
+        <button id="browseProject">参照…</button>
+      </div>
+      <div class="field">
+        <label for="out">出力 CSV</label>
+        <input type="text" id="out" placeholder="未指定なら <プロジェクト>\npm-dependencies.csv">
+        <button id="browseOut">参照…</button>
+      </div>
+      <div class="options">
+        <label><input type="checkbox" id="includeDev"> devDependencies も含める</label>
+        <label title=".cache/<名前>@<版>.json（レジストリ API の応答）"><input type="checkbox" id="useCache" checked> レジストリ応答のキャッシュを使う</label>
+        <label>レジストリ URL <input type="text" id="registry" placeholder="https://registry.npmjs.org" style="width:260px"></label>
+      </div>
+      <div class="options">
+        <label>参照バージョン
+          <select id="versionMode">
+            <option value="installed">インストール済み（package-lock / node_modules）</option>
+            <option value="latest">npm の最新版（npm サイトの表示と同じ）</option>
+          </select>
+        </label>
+        <label>エラー時の動作
+          <select id="errorPolicy">
+            <option value="ask">確認ダイアログを表示する</option>
+            <option value="auto">確認せず自動でリトライする</option>
+            <option value="ignore">確認せず失敗のまま次へ進む</option>
+          </select>
+        </label>
+        <label>自動リトライ回数 <input type="number" id="autoRetries" min="1" max="10" value="3"> 回</label>
+      </div>
     </div>
-    <div class="options">
-      <label><input type="checkbox" id="includeDev"> devDependencies も含める</label>
-      <label><input type="checkbox" id="useCache" checked> レジストリ応答のキャッシュを使う</label>
-      <label>レジストリ URL <input type="text" id="registry" placeholder="https://registry.npmjs.org" style="width:260px"></label>
+
+    <div class="group">
+      <h3><span class="num">④</span>npm サイト照合 <small>npmjs.com の Dependencies 欄を取得し、②③と件数を照合（列: ④npm サイトの dependencies、④一致状態）</small></h3>
+      <div class="options">
+        <label><input type="checkbox" id="useSite" checked> npm サイト (npmjs.com) の Dependencies 欄も取得して照合する</label>
+        <label title=".cache/<名前>@<版>.npmsite.json。外すと毎回サイトから取得する（待ち時間も毎回入る）"><input type="checkbox" id="useSiteCache" checked> npm サイト応答のキャッシュを使う</label>
+        <label>取得ごとの待ち時間 <input type="number" id="siteWaitMin" min="0" max="600" step="0.5" value="1"> ～ <input type="number" id="siteWaitMax" min="0" max="600" step="0.5" value="3"> 秒（範囲内でランダム）</label>
+      </div>
+      <div class="options">
+        <label>取得方法
+          <select id="siteEngine">
+            <option value="cdp">内蔵（DevTools プロトコル。追加インストール不要）</option>
+            <option value="playwright">Playwright（要 npm install playwright-core）</option>
+          </select>
+        </label>
+        <label>ブラウザ <input type="text" id="browser" placeholder="空なら Edge / Chrome を自動検出（npm サイト取得に使用）" style="width:420px"></label>
+      </div>
     </div>
-    <div class="options">
-      <label>参照バージョン
-        <select id="versionMode">
-          <option value="installed">インストール済み（package-lock / node_modules）</option>
-          <option value="latest">npm の最新版（npm サイトの表示と同じ）</option>
-        </select>
-      </label>
+
+    <div class="group">
+      <h3><span class="num">⑤</span>再帰調査 <small>依存ライブラリをたどって推移的依存もすべて抽出（列: ⑤深さ、⑤要求元。結果表の「並び」で親子順表示）</small></h3>
+      <div class="options">
+        <label title="依存ライブラリ（レジストリの dependencies）を再帰的にたどり、推移的依存もすべて 1 行ずつ出す。先に再帰調査で件数を出し、確認してから本調査に入る"><input type="checkbox" id="recursive"> 再帰的にすべての依存ライブラリを抽出する（推移的依存も含める。件数を確認してから本調査）</label>
+      </div>
     </div>
-    <div class="options">
-      <label>エラー時の動作
-        <select id="errorPolicy">
-          <option value="ask">確認ダイアログを表示する</option>
-          <option value="auto">確認せず自動でリトライする</option>
-          <option value="ignore">確認せず失敗のまま次へ進む</option>
-        </select>
-      </label>
-      <label>自動リトライ回数 <input type="number" id="autoRetries" min="1" max="10" value="3"> 回</label>
+
+    <div class="group">
+      <h3><span class="num">⑥</span>脆弱性チェック <small>npm の advisories API（npm audit と同じ情報源）で既知の脆弱性を確認（列: ⑥脆弱性、⑥脆弱性の詳細）</small></h3>
+      <div class="options">
+        <label title="本調査の後に全行分をまとめて 1 回問い合わせます。結果はキャッシュしません（情報が日々変わるため）"><input type="checkbox" id="useVulns" checked> 使用しているバージョンに既知の脆弱性があるか確認する（GitHub Advisory の ID・深刻度・タイトル・リンク）</label>
+      </div>
     </div>
+
     <div class="actions">
       <button class="primary" id="run">▶ 実行</button>
       <span id="runHint" class="saved"></span>
@@ -158,10 +237,13 @@
   <section id="status">
     <h2>2. 実行状況 <span class="badge idle" id="statusBadge">待機中</span></h2>
     <div class="progress" id="progress"><div></div></div>
+    <div class="saved" id="discoveryInfo"></div>
     <div class="counters">
       <span>完了 <b id="cCompleted">0</b> / <b id="cTotal">0</b></span>
       <span>OK <b id="cOk">0</b></span>
       <span class="ng">NG <b id="cNg">0</b></span>
+      <span class="mm">不一致 <b id="cMismatch">0</b></span>
+      <span class="vv">脆弱性あり <b id="cVuln">0</b></span>
       <span>経過 <b id="cElapsed">–</b></span>
       <span id="cStats"></span>
     </div>
@@ -179,10 +261,19 @@
         <button data-filter="all" class="active">すべて</button>
         <button data-filter="ng">NG のみ</button>
         <button data-filter="ok">OK のみ</button>
+        <button data-filter="mismatch">不一致のみ</button>
+        <button data-filter="direct">直接のみ</button>
+        <button data-filter="vuln">脆弱性あり</button>
       </span>
-      <input type="text" id="search" placeholder="ライブラリ名 / ライセンスで絞り込み" style="width:260px">
+      <span class="seg-label">並び</span>
+      <span class="seg" id="orderSeg">
+        <button data-order="tree" class="active" title="直接依存の直下に子・孫をぶら下げて表示（親ごとの塊で見る）。複数の親から要求されるものは 2 回目以降を「既出」として薄く表示">親子順</button>
+        <button data-order="depth" title="直接依存 → 深さ 1 → 深さ 2 … の順（同じ深さは名前順）">深さ順</button>
+      </span>
+      <input type="text" id="search" placeholder="ライブラリ名 / ライセンス / 要求元で絞り込み" style="width:280px">
       <span id="rowCount" class="saved"></span>
       <span class="spacer"></span>
+      <button id="loadCsv" title="このツールで保存した CSV を読み込んで表示します（再取得はできません）">CSV を読み込む…</button>
       <button class="danger" id="retryAll" disabled>NG をすべて再取得</button>
       <button id="save" disabled>CSV を保存</button>
       <button id="openFolder" disabled>保存先を開く</button>
@@ -191,10 +282,20 @@
     <div class="tablewrap">
       <table>
         <thead><tr>
-          <th>状態</th><th>ライブラリ名</th><th>バージョン</th><th>種別</th><th>ライセンス</th>
-          <th title="npm レジストリ上の、そのライブラリの package.json に書かれた dependencies（要求している範囲。name@^1.2.3 の形）">依存ライブラリ</th>
-          <th title="同じ名前を、対象プロジェクトの package-lock.json で引いた、実際にインストールされている 1 つのバージョン（name@1.2.3 の形）。lock が無ければ空">取得済みライブラリ</th>
-          <th>リポジトリ</th><th>備考</th><th>操作</th>
+          <th>状態</th>
+          <th><span class="num">①</span>ライブラリ名</th>
+          <th><span class="num">①</span>バージョン</th>
+          <th><span class="num">①</span>種別</th>
+          <th title="⑤再帰調査。直接依存は 0。推移的依存は、直接依存から何段たどったか"><span class="num">⑤</span>深さ</th>
+          <th title="⑤再帰調査。このライブラリを依存として要求しているライブラリ（name@version）"><span class="num">⑤</span>要求元</th>
+          <th><span class="num">①</span>ライセンス</th>
+          <th title="②npm レジストリ上の、そのライブラリ自身の package.json に書かれた dependencies（要求している範囲。name@^1.2.3 の形）"><span class="num">②</span>依存ライブラリ<small>package.json から求まる dependencies</small></th>
+          <th title="③同じ名前を、対象プロジェクトの package-lock.json で引いた、実際にインストールされている 1 つのバージョン（name@1.2.3 の形）。lock が無ければ空"><span class="num">③</span>取得済みライブラリ<small>package-lock.json で取得したバージョン</small></th>
+          <th title="④npmjs.com の該当バージョンのページ（?activeTab=dependencies）に表示される Dependencies 欄の名前。Dev Dependencies は含まない。設定で取得しないこともできる"><span class="num">④</span>npm サイトの dependencies<small>npmjs.com の Dependencies 欄</small></th>
+          <th title="④「②依存ライブラリ」「③取得済みライブラリ」「④npm サイトの dependencies」の 3 つの件数がすべて同じなら 全一致、違えば 不一致。サイトを取得できなかったときは サイト未取得"><span class="num">④</span>一致状態<small>②③④の件数比較</small></th>
+          <th title="⑥npm の advisories API で、このバージョンに該当する既知の脆弱性の有無（件数と最高深刻度）"><span class="num">⑥</span>脆弱性<small>npm advisories</small></th>
+          <th title="⑥各脆弱性の ID・深刻度・タイトル・影響バージョン。クリックで GitHub Advisory を開く"><span class="num">⑥</span>脆弱性の詳細<small>ID / 深刻度 / リンク</small></th>
+          <th><span class="num">①</span>リポジトリ</th><th>備考</th><th>操作</th>
         </tr></thead>
         <tbody id="tbody"></tbody>
       </table>
@@ -203,6 +304,26 @@
     <div class="error" id="resultsError"></div>
   </section>
 </main>
+
+<div class="overlay" id="recursiveDialog" hidden role="dialog" aria-modal="true" aria-labelledby="recursiveDialogTitle">
+  <div class="dialog">
+    <h3 id="recursiveDialogTitle"><span class="badge wait">確認</span> 再帰調査が完了しました。本調査を開始しますか？</h3>
+    <div class="summary">
+      <span>合計（本調査の行数）</span><b id="rdTotal">0</b>
+      <span>直接依存</span><span id="rdDirect">0</span>
+      <span>推移的依存</span><span id="rdTransitive">0</span>
+      <span>最大深さ</span><span id="rdDepth">0</span>
+      <span>lock で決定 / レジストリで範囲解決</span><span id="rdLock">0 / 0</span>
+      <span>解決不能 / 取得失敗</span><span id="rdFailed">0 / 0</span>
+      <span>見込み時間</span><span id="rdEstimate">–</span>
+    </div>
+    <div class="choices">
+      <button class="primary" data-recursive="start"><b>本調査を開始</b><span>上記すべての行について、ライセンス・取得済みライブラリ・npm サイト照合を実行して CSV に出力します。</span></button>
+      <button data-recursive="cancel"><b>中止</b><span>本調査は行わず終了します（CSV は保存しません）。件数が多すぎる場合は「npm サイト照合」を外すか、待ち時間を短くして再実行してください。</span></button>
+    </div>
+    <div class="error" id="recursiveDialogError"></div>
+  </div>
+</div>
 
 <div class="overlay" id="errorDialog" hidden role="dialog" aria-modal="true" aria-labelledby="errorDialogTitle">
   <div class="dialog">
@@ -233,14 +354,19 @@
     statusBadge: $('statusBadge'), progress: $('progress'), cCompleted: $('cCompleted'), cTotal: $('cTotal'),
     cOk: $('cOk'), cNg: $('cNg'), cElapsed: $('cElapsed'), cStats: $('cStats'), log: $('log'), jobError: $('jobError'),
     search: $('search'), rowCount: $('rowCount'), retryAll: $('retryAll'), save: $('save'), openFolder: $('openFolder'),
-    savedInfo: $('savedInfo'), tbody: $('tbody'), empty: $('empty'), resultsError: $('resultsError'),
+    savedInfo: $('savedInfo'), loadCsv: $('loadCsv'), tbody: $('tbody'), empty: $('empty'), resultsError: $('resultsError'),
     errorPolicy: $('errorPolicy'), autoRetries: $('autoRetries'), versionMode: $('versionMode'),
+    recursive: $('recursive'), discoveryInfo: $('discoveryInfo'), recursiveDialog: $('recursiveDialog'), recursiveDialogError: $('recursiveDialogError'),
+    useVulns: $('useVulns'), cVuln: $('cVuln'),
+    useSite: $('useSite'), useSiteCache: $('useSiteCache'), siteWaitMin: $('siteWaitMin'), siteWaitMax: $('siteWaitMax'), browser: $('browser'), siteEngine: $('siteEngine'), cMismatch: $('cMismatch'),
     errorDialog: $('errorDialog'), edName: $('edName'), edMessage: $('edMessage'), edAttempt: $('edAttempt'),
     edAutoDesc: $('edAutoDesc'), dialogError: $('dialogError'),
   };
 
   let state = null;
   let filter = 'all';
+  let order = 'tree'; // 表と CSV の並び順: tree（親子順）| depth（深さ順）
+  try { const o = localStorage.getItem('nld.order'); if (o === 'tree' || o === 'depth') order = o; } catch {}
   const openDeps = new Set(); // 展開中の依存一覧（ライブラリ名）
   let busy = false;
 
@@ -255,6 +381,14 @@
     if (saved.errorPolicy) els.errorPolicy.value = saved.errorPolicy;
     if (saved.autoRetries) els.autoRetries.value = saved.autoRetries;
     if (saved.versionMode) els.versionMode.value = saved.versionMode;
+    if (saved.useSite === false) els.useSite.checked = false;
+    if (saved.useSiteCache === false) els.useSiteCache.checked = false;
+    if (saved.siteWaitMin != null) els.siteWaitMin.value = saved.siteWaitMin;
+    if (saved.siteWaitMax != null) els.siteWaitMax.value = saved.siteWaitMax;
+    if (saved.browser) els.browser.value = saved.browser;
+    if (saved.siteEngine) els.siteEngine.value = saved.siteEngine;
+    if (saved.recursive) els.recursive.checked = true;
+    if (saved.useVulns === false) els.useVulns.checked = false;
   } catch {}
   function persist() {
     try {
@@ -262,6 +396,8 @@
         project: els.project.value, out: els.out.value, includeDev: els.includeDev.checked,
         useCache: els.useCache.checked, registry: els.registry.value,
         errorPolicy: els.errorPolicy.value, autoRetries: els.autoRetries.value, versionMode: els.versionMode.value,
+        useSite: els.useSite.checked, useSiteCache: els.useSiteCache.checked, siteWaitMin: els.siteWaitMin.value, siteWaitMax: els.siteWaitMax.value, browser: els.browser.value,
+        siteEngine: els.siteEngine.value, recursive: els.recursive.checked, useVulns: els.useVulns.checked,
       }));
     } catch {}
   }
@@ -298,7 +434,25 @@
       useCache: els.useCache.checked, registry: els.registry.value,
       errorPolicy: els.errorPolicy.value, autoRetries: Number(els.autoRetries.value) || 3,
       versionMode: els.versionMode.value,
+      useSite: els.useSite.checked,
+      useSiteCache: els.useSiteCache.checked,
+      siteWait: { min: Number(els.siteWaitMin.value), max: Number(els.siteWaitMax.value) },
+      browser: els.browser.value,
+      siteEngine: els.siteEngine.value,
+      recursive: els.recursive.checked,
+      useVulns: els.useVulns.checked,
+      order,
     });
+  });
+  // 再帰調査の件数確認 → サーバーへ通知
+  els.recursiveDialog.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('button[data-recursive]');
+    if (!btn) return;
+    els.recursiveDialogError.textContent = '';
+    for (const b of els.recursiveDialog.querySelectorAll('button')) b.disabled = true;
+    try { await api('/api/recursive-decision', { action: btn.dataset.recursive }); }
+    catch (err) { els.recursiveDialogError.textContent = err.message; }
+    finally { for (const b of els.recursiveDialog.querySelectorAll('button')) b.disabled = false; }
   });
   // エラー確認ダイアログの選択 → サーバーへ通知（サーバー側で待っている取得処理が再開する）
   let deciding = false;
@@ -323,12 +477,31 @@
       if (!r.path) return;
       out = r.path; els.out.value = out; persist();
     }
-    await api('/api/save', { out });
+    await api('/api/save', { out, order });
   });
   els.openFolder.onclick = () => withBusy(els.openFolder, els.resultsError, () => api('/api/open'));
-  for (const b of document.querySelectorAll('.seg button')) {
-    b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('active', x === b)); renderTable(); };
+  // 保存した CSV を読み込んで表示（ダイアログが使えない環境ではパスを入力）
+  els.loadCsv.onclick = () => withBusy(els.loadCsv, els.resultsError, async () => {
+    let p = null;
+    try {
+      const r = await api('/api/dialog/open', { initial: els.out.value || (state && state.out) || els.project.value });
+      p = r.path;
+    } catch (err) {
+      p = window.prompt(`ファイル選択ダイアログを開けませんでした（${err.message}）。CSV のパスを入力してください`, els.out.value || '');
+    }
+    if (!p) return;
+    await api('/api/load', { path: p });
+    filter = 'all';
+    document.querySelectorAll('.seg button[data-filter]').forEach((x) => x.classList.toggle('active', x.dataset.filter === 'all'));
+  });
+  for (const b of document.querySelectorAll('.seg button[data-filter]')) {
+    b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll('.seg button[data-filter]').forEach((x) => x.classList.toggle('active', x === b)); renderTable(); };
   }
+  const syncOrderButtons = () => document.querySelectorAll('#orderSeg button').forEach((x) => x.classList.toggle('active', x.dataset.order === order));
+  for (const b of document.querySelectorAll('#orderSeg button')) {
+    b.onclick = () => { order = b.dataset.order; try { localStorage.setItem('nld.order', order); } catch {} syncOrderButtons(); renderTable(); };
+  }
+  syncOrderButtons();
   els.search.oninput = renderTable;
   // 仕様ページは常に同じ名前のウィンドウで開き、既に開いていればそれを前面に出す
   for (const a of document.querySelectorAll('a[target="nld-spec"]')) {
@@ -338,7 +511,10 @@
       if (w) w.focus();
     });
   }
-  for (const el of [els.project, els.out, els.includeDev, els.useCache, els.registry, els.errorPolicy, els.autoRetries, els.versionMode]) el.addEventListener('change', persist);
+  for (const el of [els.project, els.out, els.includeDev, els.useCache, els.registry, els.errorPolicy, els.autoRetries, els.versionMode, els.useSite, els.useSiteCache, els.siteWaitMin, els.siteWaitMax, els.browser, els.siteEngine, els.recursive, els.useVulns]) el.addEventListener('change', persist);
+  const syncSiteInputs = () => { for (const el of [els.useSiteCache, els.siteWaitMin, els.siteWaitMax, els.browser, els.siteEngine]) el.disabled = !els.useSite.checked; };
+  els.useSite.addEventListener('change', syncSiteInputs);
+  syncSiteInputs();
   els.tbody.addEventListener('click', (ev) => {
     const btn = ev.target.closest('button[data-retry]');
     if (btn) withBusy(btn, els.resultsError, () => api('/api/retry', { indices: [Number(btn.dataset.retry)] }));
@@ -372,13 +548,40 @@
     const rows = state.rows.filter(Boolean);
     const ok = rows.filter((r) => r.ok).length;
     const ng = rows.length - ok;
+    const mismatch = rows.filter((r) => r.match === '不一致').length;
+    const siteErr = rows.filter((r) => r.siteStatus === 'error').length;
+    const vulnCount = rows.filter((r) => r.vulns && r.vulns.length).length;
     const running = state.status === 'running';
     const retrying = state.retrying.length > 0;
 
     const badge = { idle: ['idle', '待機中'], running: ['running', '実行中'], done: ['done', '完了'], error: ['error', 'エラー'] }[state.status];
     const waiting = Boolean(state.pending);
-    els.statusBadge.className = 'badge ' + (waiting ? 'wait' : retrying ? 'retry' : badge[0]);
-    els.statusBadge.textContent = waiting ? '確認待ち' : retrying ? '再取得中' : badge[1];
+    const confirming = Boolean(state.pendingRecursive);
+    const discovering = running && state.phase === 'discover';
+    els.statusBadge.className = 'badge ' + (waiting || confirming ? 'wait' : retrying ? 'retry' : badge[0]);
+    els.statusBadge.textContent = confirming ? '件数確認待ち' : waiting ? '確認待ち' : retrying ? '再取得中' : discovering ? '再帰調査中' : badge[1];
+
+    // 再帰調査の件数確認ダイアログ
+    if (confirming) {
+      const s = state.pendingRecursive;
+      $('rdTotal').textContent = s.total;
+      $('rdDirect').textContent = s.direct;
+      $('rdTransitive').textContent = s.transitive;
+      $('rdDepth').textContent = s.maxDepth;
+      $('rdLock').textContent = `${s.fromLock} / ${s.total - s.fromLock - s.failed}`;
+      $('rdFailed').textContent = `${s.unresolved} / ${s.failed}`;
+      const avgWait = state.useSite ? (state.siteWait.min + state.siteWait.max) / 2 : 0;
+      $('rdEstimate').textContent = state.useSite
+        ? `npm サイト照合あり: 最大およそ ${Math.ceil(s.total * (avgWait + 3) / 60)} 分（キャッシュ済みの分は短縮）`
+        : 'npm サイト照合なし: 数秒〜1 分程度';
+    }
+    els.recursiveDialog.hidden = !confirming;
+    els.progress.classList.toggle('indeterminate', discovering);
+    const d = state.discovery, ds = state.discoverySummary;
+    els.discoveryInfo.textContent = !state.recursive ? ''
+      : discovering && d ? `再帰調査中: ${d.total} 件を発見（${d.processed} 件を確認済み）`
+      : ds ? `再帰調査: 合計 ${ds.total} 件（直接 ${ds.direct} / 推移的 ${ds.transitive}、最大深さ ${ds.maxDepth}）`
+      : '';
 
     // エラー確認ダイアログ
     if (waiting) {
@@ -389,11 +592,13 @@
     }
     els.errorDialog.hidden = !waiting;
     els.progress.classList.toggle('done', state.status === 'done');
-    els.progress.firstElementChild.style.width = state.total ? (state.completed / state.total * 100) + '%' : '0';
+    els.progress.firstElementChild.style.width = discovering ? '30%' : state.total ? (state.completed / state.total * 100) + '%' : '0';
     els.cCompleted.textContent = state.completed;
     els.cTotal.textContent = state.total;
     els.cOk.textContent = ok;
     els.cNg.textContent = ng;
+    els.cMismatch.textContent = mismatch;
+    els.cVuln.textContent = vulnCount;
     els.cStats.textContent = state.stats ? `レジストリ要求 ${state.stats.requests} 回 / キャッシュ ${state.stats.cacheHits} 件` : '';
     renderElapsed();
     els.jobError.textContent = state.error || '';
@@ -404,10 +609,14 @@
     if (atBottom) els.log.scrollTop = els.log.scrollHeight;
 
     els.run.disabled = busy || running || retrying;
-    els.retryAll.disabled = busy || running || retrying || ng === 0;
+    const fromCsv = state.source === 'csv';
+    els.retryAll.disabled = busy || running || retrying || fromCsv || (ng === 0 && siteErr === 0);
     els.save.disabled = busy || running || retrying || rows.length === 0;
+    els.loadCsv.disabled = busy || running || retrying;
     els.openFolder.disabled = !state.savedAt;
-    els.savedInfo.textContent = state.savedAt ? `CSV 保存済み (${fmtTime(state.savedAt)}): ${state.out}` : (state.out ? `保存先: ${state.out}` : '');
+    els.savedInfo.textContent = fromCsv
+      ? `CSV から読み込み (保存日時 ${state.savedAt ? new Date(state.savedAt).toLocaleString('ja-JP') : '不明'}): ${state.loadedFrom} — 再取得はできません`
+      : state.savedAt ? `CSV 保存済み (${fmtTime(state.savedAt)}): ${state.out}` : (state.out ? `保存先: ${state.out}` : '');
     renderTable();
   }
 
@@ -415,18 +624,22 @@
     if (!state) return;
     const q = els.search.value.trim().toLowerCase();
     const retrying = new Set(state.retrying);
-    const items = state.rows.map((row, index) => ({ row, index })).filter(({ row }) => {
+    const items = orderItems(state.rows).filter(({ row }) => {
       if (filter === 'ng' && (!row || row.ok)) return false;
       if (filter === 'ok' && (!row || !row.ok)) return false;
-      if (q && row && !(row.name.toLowerCase().includes(q) || row.license.toLowerCase().includes(q))) return false;
+      if (filter === 'mismatch' && (!row || row.match !== '不一致')) return false;
+      if (filter === 'direct' && (!row || row.depth > 0)) return false;
+      if (filter === 'vuln' && (!row || !(row.vulns && row.vulns.length))) return false;
+      if (q && row && !(row.name.toLowerCase().includes(q) || row.license.toLowerCase().includes(q) || (row.parents || []).some((p) => p.toLowerCase().includes(q)))) return false;
       return true;
     });
     els.empty.hidden = state.rows.length > 0;
-    els.rowCount.textContent = state.rows.length ? `${items.length} / ${state.rows.length} 件を表示` : '';
-    const locked = busy || state.status === 'running' || retrying.size > 0;
+    const dupCount = items.filter((it) => it.dup).length;
+    els.rowCount.textContent = state.rows.length ? `${items.length} 行を表示 / ${state.rows.length} 件${dupCount ? `（既出 ${dupCount} 行を含む）` : ''}` : '';
+    const locked = busy || state.status === 'running' || retrying.size > 0 || state.source === 'csv';
 
-    els.tbody.innerHTML = items.map(({ row, index }) => {
-      if (!row) return `<tr class="pending"><td><span class="badge wait">取得中</span></td><td colspan="9">…</td></tr>`;
+    els.tbody.innerHTML = items.map(({ row, index, level = 0, dup = false }) => {
+      if (!row) return `<tr class="pending"><td><span class="badge wait">取得中</span></td><td colspan="15">…</td></tr>`;
       const isRetry = retrying.has(index);
       const status = isRetry ? '<span class="badge retry">再取得中</span>' : row.ok ? '<span class="badge ok">OK</span>' : '<span class="badge ng">NG</span>';
       const depList = (key, list) => list.length
@@ -435,20 +648,89 @@
         : (row.ok ? '<span class="saved">なし</span>' : '');
       const deps = depList('req', row.dependencies);
       const fetched = depList('got', row.dependenciesResolved);
+      const siteLink = row.siteUrl ? `<a class="ext" href="${esc(row.siteUrl)}" target="_blank" rel="noopener" title="${esc(row.siteUrl)}">npm ↗</a>` : '';
+      const siteCell = row.siteStatus === 'ok' ? `<div class="sitecell">${depList('site', row.siteDependencies)}${siteLink}</div>`
+        : row.siteStatus === 'error' ? `<div class="sitecell"><span class="badge wait" title="${esc(row.note)}">未取得</span>${siteLink}</div>`
+        : (row.ok ? '<span class="saved">—</span>' : '');
+      const depTypeLabel = row.depType === 'transitive' ? '推移的' : row.depType;
+      const parents = row.parents || [];
+      const parentsCell = parents.length
+        ? `<div class="parents" title="${esc(parents.join(', '))}">${esc(parents.slice(0, 2).join(', '))}${parents.length > 2 ? ` 他 ${parents.length - 2}` : ''}</div>`
+        : '';
+      const matchClass = row.match === '全一致' ? 'ok' : row.match === '不一致' ? 'ng' : 'wait';
+      const matchCell = row.match
+        ? `<span class="badge ${matchClass}">${esc(row.match)}</span>${row.counts ? `<div class="counts">依存 ${row.counts.dependencies} / 取得済 ${row.counts.resolved} / サイト ${row.counts.site}</div>` : ''}`
+        : (row.ok ? '<span class="saved">—</span>' : '');
+      // ⑥ 脆弱性
+      const vulns = row.vulns || [];
+      const vulnCell = row.vulnStatus === 'ok'
+        ? (vulns.length
+            ? `<span class="badge sev-${esc(row.vulnHighest || 'info')}">あり ${vulns.length} 件</span><div class="counts">最高 ${esc(row.vulnHighest || '')}</div>`
+            : '<span class="badge ok">なし</span>')
+        : row.vulnStatus === 'error' ? `<span class="badge wait" title="${esc(row.note)}">確認失敗</span>`
+        : (row.ok ? '<span class="saved">—</span>' : '');
+      const vulnKey = 'vuln:' + row.name;
+      const vulnDetails = vulns.length
+        ? `<details class="deps" data-name="${esc(vulnKey)}" ${openDeps.has(vulnKey) ? 'open' : ''}><summary>${vulns.length} 件を表示</summary><ul class="vulns">${vulns.map((v) => `<li><span class="badge sev-${esc(v.severity)} sev">${esc(v.severity)}${v.cvssScore != null ? ' ' + v.cvssScore : ''}</span><a href="${esc(v.url)}" target="_blank" rel="noopener" title="${esc(v.title)}${v.vulnerableVersions ? '\n影響: ' + esc(v.vulnerableVersions) : ''}">${esc(v.id)}</a> ${esc(v.title)}${v.vulnerableVersions ? ` <span class="saved">(影響: ${esc(v.vulnerableVersions)})</span>` : ''}</li>`).join('')}</ul></details>`
+        : '';
       const repo = row.repository ? `<a class="mono" href="${esc(repoLink(row.repository))}" target="_blank" rel="noopener">${esc(row.repository.replace(/^git\+/, ''))}</a>` : '';
-      return `<tr class="${row.ok ? 'ok' : 'ng'}">
+      const treePrefix = level > 0 ? `<span class="tree">${'　'.repeat(level - 1)}└ </span>` : '';
+      const dupMark = dup ? ' <span class="badge idle" title="他の親の下に既出（同じ name@version）。その下の子はそちらを参照">既出</span>' : '';
+      return `<tr class="${row.ok ? 'ok' : 'ng'}${dup ? ' dup' : ''}">
         <td>${status}</td>
-        <td class="name">${esc(row.name)}</td>
+        <td class="name">${treePrefix}${esc(row.name)}${dupMark}</td>
         <td class="mono">${esc(row.version)}</td>
-        <td>${esc(row.depType)}</td>
+        <td>${esc(depTypeLabel)}</td>
+        <td class="mono">${row.depth ?? 0}</td>
+        <td>${parentsCell}</td>
         <td>${esc(row.license)}</td>
         <td>${deps}</td>
         <td>${fetched}</td>
+        <td>${siteCell}</td>
+        <td>${matchCell}</td>
+        <td>${vulnCell}</td>
+        <td>${vulnDetails}</td>
         <td>${repo}</td>
         <td class="note">${esc(row.note)}</td>
         <td><button class="small" data-retry="${index}" ${locked ? 'disabled' : ''}>再取得</button></td>
       </tr>`;
     }).join('');
+  }
+  /**
+   * 表示順を作る。各要素は { row, index, level, dup }。
+   *  tree : 直接依存（元の順）の直下に子を名前順で深さ優先にぶら下げる。複数の親から要求される行は 2 回目以降を dup=true で出す（親ごとの塊を欠かさない）
+   *  depth: 深さ → 名前 の順。dup は無い
+   * 取得中（null）の行は末尾。
+   */
+  function orderItems(rows) {
+    const all = rows.map((row, index) => ({ row, index }));
+    const pending = all.filter((it) => !it.row);
+    const done = all.filter((it) => it.row);
+    if (order === 'depth') {
+      done.sort((a, b) => (a.row.depth ?? 0) - (b.row.depth ?? 0) || a.row.name.localeCompare(b.row.name));
+      return [...done.map((it) => ({ ...it, level: 0, dup: false })), ...pending];
+    }
+    const key = (r) => r.name + '@' + r.version;
+    const children = new Map();
+    const roots = [];
+    for (const it of done) {
+      const r = it.row;
+      if ((r.depth ?? 0) === 0 || !(r.parents && r.parents.length)) roots.push(it);
+      for (const p of r.parents || []) { if (!children.has(p)) children.set(p, []); children.get(p).push(it); }
+    }
+    for (const list of children.values()) list.sort((a, b) => a.row.name.localeCompare(b.row.name));
+    const out = [];
+    const seen = new Set();
+    const visit = (it, level) => {
+      const k = key(it.row);
+      if (seen.has(k)) { out.push({ ...it, level, dup: true }); return; } // 既出: 表示はするが、その下は展開しない
+      seen.add(k);
+      out.push({ ...it, level, dup: false });
+      for (const c of children.get(k) || []) visit(c, level + 1);
+    };
+    for (const it of roots) visit(it, 0);
+    for (const it of done) if (!seen.has(key(it.row))) visit(it, 0);
+    return [...out, ...pending];
   }
   function repoLink(url) {
     return url.replace(/^git\+/, '').replace(/^git:\/\//, 'https://').replace(/^ssh:\/\/git@/, 'https://').replace(/\.git$/, '');

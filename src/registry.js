@@ -77,23 +77,33 @@ export class RegistryClient {
     }
   }
 
-  async readCache(file) {
-    if (!this.cacheDir) return null;
-    try {
-      return JSON.parse(await readFile(path.join(this.cacheDir, file), 'utf8'));
-    } catch {
-      return null;
-    }
+  readCache(file) {
+    return readJsonCache(this.cacheDir, file);
   }
 
-  async writeCache(file, data) {
-    if (!this.cacheDir) return;
-    try {
-      await mkdir(this.cacheDir, { recursive: true });
-      await writeFile(path.join(this.cacheDir, file), JSON.stringify(data), 'utf8');
-    } catch {
-      // キャッシュ書き込み失敗は致命的ではないので無視する
-    }
+  writeCache(file, data) {
+    return writeJsonCache(this.cacheDir, file, data);
+  }
+}
+
+/** cacheDir/file の JSON を読む。無い・壊れている・cacheDir が null なら null。 */
+export async function readJsonCache(cacheDir, file) {
+  if (!cacheDir) return null;
+  try {
+    return JSON.parse(await readFile(path.join(cacheDir, file), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/** cacheDir/file に JSON を書く。失敗は致命的ではないので握りつぶす。 */
+export async function writeJsonCache(cacheDir, file, data) {
+  if (!cacheDir) return;
+  try {
+    await mkdir(cacheDir, { recursive: true });
+    await writeFile(path.join(cacheDir, file), JSON.stringify(data), 'utf8');
+  } catch {
+    // キャッシュ書き込み失敗は無視する
   }
 }
 
@@ -109,7 +119,7 @@ export function encodePackageName(name) {
   return name.startsWith('@') ? `@${encodeURIComponent(name.slice(1))}` : encodeURIComponent(name);
 }
 
-function safeFileName(name) {
+export function safeFileName(name) {
   return name.replace(/[@/\\:*?"<>|]/g, '_');
 }
 
@@ -122,7 +132,7 @@ function sleep(ms) {
 }
 
 /** 同時実行数を制限する簡易リミッター。 */
-function createLimiter(max) {
+export function createLimiter(max) {
   let active = 0;
   const queue = [];
   const next = () => {

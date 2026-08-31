@@ -41,6 +41,23 @@ if ($r -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.Fi
   return runDialog(script, { NLD_INITIAL: initialPath });
 }
 
+export async function pickOpenCsv(initialPath = '') {
+  const script = `
+${PS_PRELUDE}
+$d = New-Object System.Windows.Forms.OpenFileDialog
+$d.Title = '読み込む CSV（このツールで保存したもの）を選択してください'
+$d.Filter = 'CSV ファイル (*.csv)|*.csv|すべてのファイル (*.*)|*.*'
+$d.CheckFileExists = $true
+if ($env:NLD_INITIAL) {
+  $dir = if (Test-Path -LiteralPath $env:NLD_INITIAL -PathType Container) { $env:NLD_INITIAL } else { Split-Path -Parent $env:NLD_INITIAL }
+  if ($dir -and (Test-Path -LiteralPath $dir)) { $d.InitialDirectory = $dir }
+}
+$r = $d.ShowDialog((New-TopMostOwner))
+if ($r -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.FileName) }
+`;
+  return runDialog(script, { NLD_INITIAL: initialPath });
+}
+
 const PS_PRELUDE = `
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms

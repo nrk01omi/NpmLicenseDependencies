@@ -17,7 +17,64 @@ export async function loadProject(projectDir) {
     packageJson,
     lock,
     lockVersions: lock ? lockToVersionMap(lock) : new Map(),
+    lockResolver: createLockResolver(lock),
   };
+}
+
+/**
+ * package-lock.json を Node の解決順で引くリゾルバを作る。
+ *   resolve(name, parentPath) — parentPath は親パッケージの lock 上の位置（例: ['winston'] や ['a', 'b']）。
+ *   親の直下 (node_modules/親/node_modules/name) → 祖先の直下 → トップレベル (node_modules/name) の順に探し、
+ *   最初に見つかった { version, path } を返す。無ければ null。
+ * lockfileVersion 2/3 は packages のキー、v1 は dependencies の入れ子をたどる。
+ * トップレベル優先の lockToVersionMap と違い、ネストされた別バージョンを使う親では正しくネスト側を返す。
+ */
+export function createLockResolver(lock) {
+  const empty = { size: 0, resolve: () => null };
+  if (!lock || typeof lock !== 'object') return empty;
+
+  if (lock.packages && typeof lock.packages === 'object') {
+    const pkgs = lock.packages;
+    const keyOf = (pathArr) => pathArr.map((n) => `node_modules/${n}`).join('/');
+    return {
+      size: Object.keys(pkgs).filter((k) => k.startsWith('node_modules/')).length,
+      resolve(name, parentPath = []) {
+        for (let i = parentPath.length; i >= 0; i -= 1) {
+          const candidate = [...parentPath.slice(0, i), name];
+          const entry = pkgs[keyOf(candidate)];
+          if (entry && typeof entry.version === 'string') return { version: entry.version, path: candidate };
+        }
+        return null;
+      },
+    };
+  }
+
+  if (lock.dependencies && typeof lock.dependencies === 'object') {
+    const entryAt = (pathArr) => {
+      let deps = lock.dependencies;
+      let entry = null;
+      for (const n of pathArr) {
+        entry = deps && deps[n];
+        if (!entry) return null;
+        deps = entry.dependencies;
+      }
+      return entry;
+    };
+    const count = (deps) =>
+      Object.values(deps ?? {}).reduce((n, e) => n + 1 + (e && e.dependencies ? count(e.dependencies) : 0), 0);
+    return {
+      size: count(lock.dependencies),
+      resolve(name, parentPath = []) {
+        for (let i = parentPath.length; i >= 0; i -= 1) {
+          const candidate = [...parentPath.slice(0, i), name];
+          const entry = entryAt(candidate);
+          if (entry && typeof entry.version === 'string') return { version: entry.version, path: candidate };
+        }
+        return null;
+      },
+    };
+  }
+  return empty;
 }
 
 /**

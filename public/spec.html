@@ -41,8 +41,12 @@
   <h1>動作仕様・使い方</h1>
   <nav>
     <a href="#overview">概要</a>
+    <a href="#features">機能番号 ①〜⑥</a>
     <a href="#columns">列の意味と取得方法</a>
     <a href="#version">参照バージョン</a>
+    <a href="#site">npm サイト照合</a>
+    <a href="#recursive">再帰調査</a>
+    <a href="#vulns">脆弱性チェック</a>
     <a href="#cando">できること</a>
     <a href="#cannot">できないこと</a>
     <a href="#errors">エラー時の動作</a>
@@ -56,13 +60,27 @@
   <h2>概要</h2>
   <p>対象プロジェクトの <code>package.json</code> に書かれた<b>直接依存ライブラリ</b>を 1 行ずつ取り上げ、
   <b>npm レジストリ API</b>（<code>https://registry.npmjs.org</code>、JSON）から「バージョン・ライセンス・依存ライブラリ」を取得して CSV に出力します。
-  npmjs.com の Web ページ（HTML）は読みません。</p>
+  加えて、設定で <b>npm サイト（npmjs.com）の Dependencies 欄</b>も取得し、3 者の件数を照合できます（<a href="#site">npm サイト照合</a>。取得しない設定も可）。</p>
   <div class="flow">
     <b>入力</b><span><code>package.json</code>（必須）、<code>package-lock.json</code>（任意・推奨）、<code>node_modules/</code>（任意）</span>
     <b>問い合わせ先</b><span><code>GET https://registry.npmjs.org/&lt;ライブラリ名&gt;/&lt;バージョン&gt;</code> — そのバージョンの package.json 相当の JSON が返ります</span>
     <b>出力</b><span>UTF-8（BOM 付き）の CSV。Excel でそのまま開けます</span>
   </div>
-  <div class="note">推移的依存（依存の依存…）は展開しません。全体の網羅は CycloneDX の SBOM に任せ、このツールは「直接依存 1 段目の正確な情報」を担当する設計です。</div>
+  <div class="note">既定では推移的依存（依存の依存…）は展開せず、直接依存 1 段目だけを扱います。設定「再帰的にすべての依存ライブラリを抽出する」を入れると、依存ライブラリをたどって推移的依存も 1 行ずつ出せます（<a href="#recursive">再帰調査</a>）。</div>
+</section>
+
+<section id="features">
+  <h2>機能番号 ①〜⑥ — 設定と列の対応</h2>
+  <p>画面の設定と結果表の列見出しには同じ番号が付いています。<b>①だけで基本の CSV が出ます</b>（②③は①に含まれます）。④⑤⑥は任意で、必要なときだけ有効にしてください。</p>
+  <table>
+    <tr><th>番号</th><th>機能</th><th>結果表の列</th><th>設定</th><th>詳細</th></tr>
+    <tr id="f1"><td><b>①</b></td><td>基本取得</td><td>ライブラリ名・バージョン・種別・ライセンス・リポジトリ</td><td>プロジェクトフォルダ、出力 CSV、devDependencies、レジストリ URL／キャッシュ、参照バージョン、エラー時の動作</td><td><a href="#columns">列の意味</a>、<a href="#version">参照バージョン</a>、<a href="#errors">エラー時の動作</a></td></tr>
+    <tr id="f2"><td><b>②</b></td><td>依存ライブラリ</td><td>依存ライブラリ（package.json から求まる dependencies）</td><td>なし（①の参照バージョンに従う）</td><td><a href="#columns">列の意味</a></td></tr>
+    <tr id="f3"><td><b>③</b></td><td>取得済みライブラリ</td><td>取得済みライブラリ（package-lock.json で取得したバージョン）</td><td>なし（対象プロジェクトの package-lock.json を読む）</td><td><a href="#columns">列の意味</a></td></tr>
+    <tr id="f4"><td><b>④</b></td><td>npm サイト照合</td><td>npm サイトの dependencies、一致状態</td><td>取得する／しない、サイト応答のキャッシュ、待ち時間、取得方法（内蔵／Playwright）、ブラウザ</td><td><a href="#site">npm サイト照合</a></td></tr>
+    <tr id="f5"><td><b>⑤</b></td><td>再帰調査</td><td>深さ、要求元（＋結果表の「並び: 親子順／深さ順」）</td><td>再帰的にすべての依存ライブラリを抽出する</td><td><a href="#recursive">再帰調査</a></td></tr>
+    <tr id="f6"><td><b>⑥</b></td><td>脆弱性チェック</td><td>脆弱性、脆弱性の詳細</td><td>使用しているバージョンに既知の脆弱性があるか確認する</td><td><a href="#vulns">脆弱性チェック</a></td></tr>
+  </table>
 </section>
 
 <section id="columns">
@@ -71,20 +89,39 @@
     <tr><th>列</th><th>取得元と方法</th></tr>
     <tr><td>ライブラリ名</td><td><code>package.json</code> の <code>dependencies</code>（設定により <code>devDependencies</code> も）のキー。</td></tr>
     <tr><td>バージョン</td><td>レジストリに問い合わせた<b>正確なバージョン</b>。決め方は <a href="#version">参照バージョン</a> を参照。</td></tr>
-    <tr><td>依存種別</td><td><code>dependencies</code> / <code>devDependencies</code> のどちらに書かれていたか。</td></tr>
+    <tr><td>依存種別</td><td><code>dependencies</code> / <code>devDependencies</code> のどちらに書かれていたか。再帰調査で見つかった推移的依存は <code>transitive</code>（画面では「推移的」）。</td></tr>
+    <tr><td>深さ</td><td>直接依存は 0。推移的依存は、直接依存から何段たどったか（複数経路があれば最短）。</td></tr>
+    <tr><td>要求元</td><td>このライブラリを依存として要求しているライブラリ（<code>名前@バージョン</code>、複数なら <code>; </code> 区切り）。再帰調査のときのみ。</td></tr>
     <tr><td>ライセンス</td><td>レジストリから返った JSON の <code>license</code>。文字列ならそのまま、<code>{ type: "MIT" }</code> 形式なら type、旧形式 <code>licenses: [...]</code> は type を <code>OR</code> で連結。無ければ <code>UNKNOWN</code>、取得できなければ <code>取得失敗</code>。</td></tr>
-    <tr><td><b>依存ライブラリ</b></td><td>
-      レジストリから返った JSON の <code>dependencies</code>（そのライブラリの作者が package.json に書いたもの）。<br>
+    <tr><td><b>依存ライブラリ</b><br><span class="muted">package.json から求まる dependencies</span></td><td>
+      レジストリから返った JSON の <code>dependencies</code>（そのライブラリ<b>自身</b>の package.json に作者が書いたもの。対象プロジェクトの package.json ではありません）。<br>
       <b>「そのライブラリが要求している範囲」</b>を <code>名前@範囲</code> の形で <code>; </code> 区切りに並べます。<br>
       例: <code>follow-redirects@^1.15.11; form-data@^4.0.5; proxy-from-env@^2.1.0</code><br>
       <span class="muted">npm サイトの Dependencies 欄に並ぶ名前と同じ内容です（ただしサイトは最新版を表示。<a href="#version">参照バージョン</a> 参照）。</span>
     </td></tr>
-    <tr><td><b>取得済みライブラリ</b></td><td>
+    <tr><td><b>取得済みライブラリ</b><br><span class="muted">package-lock.json で取得したバージョン</span></td><td>
       「依存ライブラリ」に出た名前を、<b>対象プロジェクトの <code>package-lock.json</code></b> で引き、
       <b>「実際にインストールされている 1 つのバージョン」</b>を <code>名前@バージョン</code> の形で並べます。<br>
       例: <code>follow-redirects@1.15.11; form-data@4.0.5; proxy-from-env@2.1.0</code><br>
-      引く場所: lockfileVersion 2/3 は <code>packages["node_modules/&lt;名前&gt;"].version</code>、v1 は <code>dependencies[&lt;名前&gt;].version</code>。<br>
+      引く場所は <b>Node の解決順</b>: その行のライブラリの直下（<code>node_modules/&lt;行の名前&gt;/node_modules/&lt;名前&gt;</code>）→ 祖先の直下 → トップレベル（<code>node_modules/&lt;名前&gt;</code>）の順に探し、最初に見つかったものを使います（lockfileVersion 1/2/3 とも）。
+      同じ名前が別バージョンでネストされている場合（例: 親 winston だけが readable-stream 3.x を使い、トップレベルは 1.x）も、その親が実際に使うネスト側のバージョンを返します。<br>
       <code>package-lock.json</code> が無いプロジェクトでは<b>空</b>になります。lock に無い名前は備考に <code>lock 未解決: …</code> と出ます。
+    </td></tr>
+    <tr><td><b>npm サイトの dependencies</b><br><span class="muted">npmjs.com の Dependencies 欄</span></td><td>
+      <code>https://www.npmjs.com/package/&lt;名前&gt;/v/&lt;バージョン&gt;?activeTab=dependencies</code> のページに表示される <b>Dependencies</b> 欄のライブラリ名（Dev Dependencies は含めない）。名前のみで範囲は付きません。<br>
+      取得方法は <a href="#site">npm サイト照合</a> 参照。設定で取得しない場合は空。取得できなかった場合は空で、備考に理由が出ます。
+    </td></tr>
+    <tr><td><b>一致状態</b></td><td>
+      「依存ライブラリ」「取得済みライブラリ」「npm サイトの dependencies」の <b>3 つの件数</b>を比べた結果。<br>
+      <span class="ok">全一致</span> 3 つとも同じ件数　<span class="ng">不一致</span> どれかが違う（備考に「lock 未解決: …」「サイトのみ: …」などの内訳）　<code>サイト未取得</code> サイトを取得できず比較不能。<br>
+      npm サイトを取得しない設定では空。取得失敗行（ライセンス <code>取得失敗</code>）も空。
+    </td></tr>
+    <tr><td><b>脆弱性</b>（⑥）</td><td>
+      npm の advisories API で、その<b>バージョン</b>に該当する既知の脆弱性の有無。<code>なし</code> / <code>あり N 件 (最高 深刻度; 内訳)</code> / <code>確認失敗</code>。設定で確認しない場合は空。<br>
+      取得方法は <a href="#vulns">脆弱性チェック</a> 参照。
+    </td></tr>
+    <tr><td><b>脆弱性の詳細</b>（⑥）</td><td>
+      各脆弱性の <code>GHSA-ID [深刻度 CVSS] タイトル (影響: 範囲) URL</code> を <code>; </code> 区切りで。画面ではリンク（GitHub Advisory）として表示。
     </td></tr>
     <tr><td>リポジトリ</td><td>レジストリ JSON の <code>repository.url</code>（無ければ <code>homepage</code>）。参考情報。</td></tr>
     <tr><td>備考</td><td>取得失敗の理由、参照バージョンの補足、lock で引けなかった依存など。</td></tr>
@@ -92,11 +129,11 @@
 
   <h3>「依存ライブラリ」と「取得済みライブラリ」の使い分け</h3>
   <table>
-    <tr><th></th><th>依存ライブラリ</th><th>取得済みライブラリ</th></tr>
-    <tr><td>意味</td><td>そのライブラリが<b>要求している</b>もの</td><td>あなたの環境に<b>実際に入っている</b>もの</td></tr>
-    <tr><td>出どころ</td><td>npm レジストリ（ライブラリ側の package.json）</td><td>対象プロジェクトの package-lock.json</td></tr>
-    <tr><td>形</td><td><code>名前@^1.2.3</code>（範囲）</td><td><code>名前@1.2.3</code>（固定）</td></tr>
-    <tr><td>向いている用途</td><td>npm サイトとの照合、ライブラリの要求内容の確認</td><td>CycloneDX（<code>pkg:npm/名前@1.2.3</code>）との突き合わせ、配布物の監査</td></tr>
+    <tr><th></th><th>依存ライブラリ</th><th>取得済みライブラリ</th><th>npm サイトの dependencies</th></tr>
+    <tr><td>意味</td><td>そのライブラリが<b>要求している</b>もの</td><td>あなたの環境に<b>実際に入っている</b>もの</td><td>npm サイトが<b>画面に表示している</b>もの</td></tr>
+    <tr><td>出どころ</td><td>npm レジストリ API（ライブラリ側の package.json）</td><td>対象プロジェクトの package-lock.json</td><td>npmjs.com の HTML（ヘッドレスブラウザで描画）</td></tr>
+    <tr><td>形</td><td><code>名前@^1.2.3</code>（範囲）</td><td><code>名前@1.2.3</code>（固定）</td><td><code>名前</code> のみ</td></tr>
+    <tr><td>向いている用途</td><td>ライブラリの要求内容の確認</td><td>CycloneDX（<code>pkg:npm/名前@1.2.3</code>）との突き合わせ、配布物の監査</td><td>レジストリ API とサイト表示の突き合わせ（検証用）</td></tr>
   </table>
 </section>
 
@@ -120,17 +157,94 @@
   <div class="note">最新版モードでは「依存ライブラリ」は最新版の要求、「取得済みライブラリ」は今の lock の中身なので、両者がずれることがあります。lock に無い依存は備考に <code>lock 未解決</code> と出ます（＝最新版に上げると新たに必要になるもの）。</div>
 </section>
 
+<section id="site">
+  <h2>npm サイト照合 — サイトの Dependencies 欄の取得方法</h2>
+  <p>npmjs.com は Cloudflare が<b>ブラウザ以外からのアクセスを 403 で拒否</b>するため、<code>fetch</code> や <code>curl</code> では取得できません。
+  そこで、利用者のマシンにインストール済みの <b>Microsoft Edge または Google Chrome</b> をヘッドレス（画面なし）で <b>1 プロセスだけ</b>起動し、
+  DevTools プロトコル（<code>--remote-debugging-pipe</code>）で同じセッション内にページを<b>順番に</b>開いて、
+  DOM 内の <code>&lt;ul aria-label="Dependencies"&gt;</code> に並ぶリンクの名前を取り出します。追加の npm パッケージ（Playwright 等）は必要ありません。<br>
+  1 セッションで Cookie を保持し、間隔を空けて順次アクセスすることで Cloudflare の確認ページ（「しばらくお待ちください…」）が出にくくなり、出た場合も解決を待ちます。</p>
+  <table>
+    <tr><th>項目</th><th>内容</th></tr>
+    <tr><td>取得方法（エンジン）</td><td>
+      <b>内蔵（既定）</b>: DevTools プロトコルを <code>--remote-debugging-pipe</code> で直接使う。追加インストール不要。<br>
+      <b>Playwright</b>: 標準的なブラウザ自動化ライブラリ <code>playwright-core</code> を使う。社内ルール等で「既知のライブラリ経由」にしたい場合に選択。
+      このツールのフォルダで <code>npm install playwright-core</code> を 1 回実行するだけで使える（ブラウザはローカルの Edge / Chrome を使うので <code>npx playwright install</code> は不要）。
+      CLI は <code>--site-engine playwright</code>。未インストールなら「サイト未取得」となり、備考にインストール方法が出る。<br>
+      どちらも「1 プロセス・順次・待ち時間・キャッシュ・確認ページ再試行」の動作は同じで、サイトへのアクセス内容（URL、User-Agent、頻度）も同じ。
+    </td></tr>
+    <tr><td>取得する／しない</td><td>設定「npm サイトの Dependencies 欄も取得して照合する」のチェック（CLI は <code>--no-site</code> で取得しない）。しない場合は「npm サイトの dependencies」「一致状態」列が空になり、実行は速くなります。</td></tr>
+    <tr><td>対象 URL</td><td><code>https://www.npmjs.com/package/&lt;名前&gt;/v/&lt;バージョン&gt;?activeTab=dependencies</code>。バージョンは「参照バージョン」で決まったもの（インストール済み or 最新版）なので、「依存ライブラリ」と同じバージョンを見ます。</td></tr>
+    <tr><td>待ち時間（可変）</td><td>サイトへの連続アクセスを避けるため、<b>取得のたびに設定範囲内のランダムな秒数</b>を待ちます（既定 1～3 秒。CLI は <code>--site-wait 1-3</code>、<code>0</code> で待たない）。ページは 1 つずつ順番に開きます（並列なし）。キャッシュにあるものは待ちません。</td></tr>
+    <tr><td>確認ページが出たとき</td><td>Cloudflare の確認ページが出た場合は最大 45 秒解決を待ち、それでも通らなければ <b>15 秒待ってもう 1 回だけ</b>試します。それでも駄目なら「サイト未取得」にして次へ進みます（実行後に「NG をすべて再取得」でやり直せます）。</td></tr>
+    <tr><td>ブラウザ</td><td>既定では <code>Program Files</code> 配下の Edge → Chrome の順に自動検出。別の場所にある場合は設定「ブラウザ」（CLI は <code>--browser</code>、または環境変数 <code>NLD_BROWSER</code>）で実行ファイルを指定。</td></tr>
+    <tr><td>キャッシュ</td><td>取得結果は <code>.cache/&lt;名前&gt;@&lt;バージョン&gt;.npmsite.json</code> に保存し、次回以降はサイトにアクセスしません（バージョンが決まれば内容は変わらないため。<b>キャッシュにあるものは待ち時間も入れず、ブラウザも起動しません</b>）。
+      レジストリ応答のキャッシュ（<code>.cache/&lt;名前&gt;@&lt;バージョン&gt;.json</code>）とは別で、設定「npm サイト応答のキャッシュを使う」（CLI <code>--no-site-cache</code>）で個別に無効化できます。ログ末尾の「サイト取得 N 回, キャッシュ M 件」で実際にサイトへ行った回数が分かります。<br>
+      ブラウザのプロファイル（Cookie）はキャッシュ設定に関係なく <code>.cache/npmsite-browser-profile/</code> に保持します。「再取得」は結果キャッシュを使いません。</td></tr>
+    <tr><td>取得できないとき</td><td>ブラウザが見つからない、Cloudflare に拒否された、タイムアウト（45 秒）、ページに Dependencies 欄が無い、などの場合は行を落とさず「一致状態」を <code>サイト未取得</code>、備考に理由を記します。レジストリ側の取得は成功しているので行は OK のままです。「NG をすべて再取得」でサイト未取得の行もやり直せます。</td></tr>
+  </table>
+  <div class="note">サイトの HTML 構造（<code>aria-label="Dependencies"</code> のリスト）が変わると取得できなくなります。その場合は「Dependencies 欄が見つかりません」となるので、取得しない設定で運用してください。</div>
+</section>
+
+<section id="recursive">
+  <h2>再帰調査 — 推移的依存をすべて抽出する（任意）</h2>
+  <p>設定「再帰的にすべての依存ライブラリを抽出する」（CLI <code>--recursive</code>）を入れると、2 段階で動きます。</p>
+  <table>
+    <tr><th>段階</th><th>内容</th></tr>
+    <tr><td>1. 再帰調査</td><td>
+      直接依存を起点に、<b>「依存ライブラリ」（レジストリ上の <code>dependencies</code>）をたどって</b>到達するすべての <code>名前@バージョン</code> を列挙します（レジストリ API のみ。ライセンスやサイト照合はまだ行いません）。<br>
+      子のバージョンの決め方（依存ライブラリベース）: ① <code>package-lock.json</code> を Node の解決順（親の直下 → 祖先 → トップレベル）で引く ② lock に無ければ、レジストリの全バージョンから要求範囲を満たす最大のもの（備考に「範囲解決」）。<br>
+      同じ <code>名前@バージョン</code> は 1 行にまとめ、「要求元」に親を列挙します。循環参照はこれで止まります。<code>devDependencies</code> / <code>peerDependencies</code> / <code>optionalDependencies</code> はたどりません。
+    </td></tr>
+    <tr><td>2. 件数の確認</td><td>
+      再帰調査が終わると、合計・直接・推移的・最大深さ・lock で決定した数・解決不能数・見込み時間を表示して<b>本調査を開始するか確認</b>します（ダイアログ「本調査を開始」／「中止」。CLI は端末で <code>y/N</code>、<code>--yes</code> で省略）。
+      npm サイト照合ありのときは 1 行あたり「待ち時間＋数秒」かかるため、件数が多い（数百件）場合はここで判断してください。中止すると CSV は保存しません。
+    </td></tr>
+    <tr><td>3. 本調査</td><td>列挙したすべての行について、通常どおりライセンス・依存ライブラリ・取得済みライブラリ・npm サイト照合を実行し、CSV に出力します。</td></tr>
+  </table>
+  <h3>並び順（親子順 / 深さ順）</h3>
+  <p>結果表の「並び」と CSV の並び（設定「並び順」／CLI <code>--order</code>）を選べます。既定は<b>親子順</b>です。</p>
+  <table>
+    <tr><th>並び</th><th>内容</th></tr>
+    <tr><td><b>親子順</b>（tree）</td><td>
+      直接依存を package.json の順に根とし、その直下に子・孫を名前順で深さ優先にぶら下げます。「ある親ライブラリが引き込む子のライセンス」を塊で確認する用途向け。<br>
+      複数の親から要求されるライブラリ（同じ <code>名前@バージョン</code>）は、<b>画面では 2 回目以降も親の下に「既出」として薄く表示</b>します（塊が欠けないように。既出の下の子は展開しません）。
+      <b>CSV では最初に現れた位置に 1 行だけ</b>出します（1 行 1 パッケージを保つため。「要求元」列で他の親が分かります）。
+    </td></tr>
+    <tr><td>深さ順（depth）</td><td>直接依存（深さ 0）→ 深さ 1 → 深さ 2 … の順。同じ深さは名前順。</td></tr>
+  </table>
+  <div class="note">再帰調査は「実際にインストールされている木」ではなく「各ライブラリが要求している依存」をたどります。lock がある限り両者は一致しますが、lock に無い依存はレジストリで範囲解決するため、実環境と異なるバージョンになることがあります（備考に記載）。</div>
+</section>
+
+<section id="vulns">
+  <h2>⑥ 脆弱性チェック — 既知の脆弱性の有無（任意）</h2>
+  <p>設定「使用しているバージョンに既知の脆弱性があるか確認する」（CLI は <code>--no-vulns</code> で無効化）を入れると、本調査の後に全行分をまとめて確認します。</p>
+  <table>
+    <tr><th>項目</th><th>内容</th></tr>
+    <tr><td>情報源</td><td>npm レジストリの一括 advisories API <code>POST &lt;レジストリ URL&gt;/-/npm/v1/security/advisories/bulk</code>。<code>npm audit</code> が使っているものと同じで、内容は GitHub Advisory Database（GHSA）。認証は不要。</td></tr>
+    <tr><td>問い合わせ方</td><td>結果表の全行（レジストリ取得が成功した行）の <code>名前 → [バージョン…]</code> をまとめて 1 回 POST（200 件ずつ分割）。応答の advisory ごとの「影響バージョン範囲」に、その行のバージョンが入るかを semver で照合して絞り込みます。</td></tr>
+    <tr><td>結果</td><td>「脆弱性」列に <code>なし</code> / <code>あり N 件 (最高 深刻度)</code>、「脆弱性の詳細」列に GHSA-ID・深刻度（CVSS スコア）・タイトル・影響範囲・GitHub Advisory へのリンク。深刻度は critical &gt; high &gt; moderate &gt; low &gt; info。</td></tr>
+    <tr><td>キャッシュ</td><td><b>しません</b>。脆弱性情報は日々追加されるため、実行のたびに問い合わせます（1 回の要求で済むので負荷は小さい）。</td></tr>
+    <tr><td>失敗したとき</td><td>API に到達できない／社内ミラーが未対応（404 等）の場合は、行を落とさず「脆弱性」列を <code>確認失敗</code>、備考に理由を出します。レジストリ URL に社内ミラーを指定している場合、ミラーがこの API を中継していないことがあります（その場合は既定の registry.npmjs.org で実行してください）。</td></tr>
+    <tr><td>再取得</td><td>行の「再取得」／「NG をすべて再取得」では、再取得した行の脆弱性も確認し直します。</td></tr>
+  </table>
+  <div class="note">「脆弱性あり」は<b>そのバージョンに公開済みの advisory がある</b>ことを示すだけで、実際に悪用可能か（該当機能を使っているか）は判断していません。修正版は各 advisory のリンク先で確認してください。</div>
+</section>
+
 <section id="cando">
   <h2>できること</h2>
   <ul class="cando">
     <li>package.json の直接依存ライブラリごとに、バージョン・ライセンス・依存ライブラリ（要求範囲）・取得済みライブラリ（lock の固定バージョン）を 1 行にまとめて CSV 出力</li>
     <li>devDependencies を含める／含めないの切り替え</li>
     <li>参照バージョンを「インストール済み」「npm の最新版」から選択</li>
+    <li>再帰調査: 依存ライブラリをたどって推移的依存もすべて 1 行ずつ出力（件数を確認してから本調査。深さ・要求元付き）</li>
+    <li>npm サイト（npmjs.com）の Dependencies 欄を取得して、依存ライブラリ／取得済みライブラリとの件数一致を「全一致／不一致」で表示（取得しない設定も可、待ち時間は可変）</li>
     <li>スコープ付きパッケージ（<code>@scope/name</code>）の取得</li>
     <li>lockfileVersion 1 / 2 / 3 の package-lock.json の読み取り</li>
     <li>レジストリ応答のキャッシュ（<code>.cache/</code>）による高速な再実行。オフラインでも一度取得済みなら完走</li>
     <li>429 / 5xx / ネットワークエラーの自動リトライ（内部で 3 回）と、それでも失敗したときの確認ダイアログ（<a href="#errors">エラー時の動作</a>）</li>
     <li>NG 行だけを後から再取得（行単位／一括）。再取得後は CSV を自動で保存し直す</li>
+    <li>保存した CSV の読み込み（「CSV を読み込む…」）。過去の結果を結果表に復元して閲覧・別名保存（再取得は不可）</li>
     <li>社内ミラー等の別レジストリ URL の指定（認証なしのもの）</li>
     <li>Windows のフォルダ選択／保存ダイアログでの入出力指定</li>
     <li>CLI（<code>node src/cli.js</code>）での同じ処理の実行（バッチ向け）</li>
@@ -140,11 +254,10 @@
 <section id="cannot">
   <h2>できないこと・限界</h2>
   <ul class="cannot">
-    <li><b>推移的依存の展開</b> — 依存の依存は列挙しません。全体の木は CycloneDX 等の SBOM で確認し、本ツールの「取得済みライブラリ」（<code>名前@バージョン</code>）と突き合わせてください</li>
+    <li><b>再帰調査での devDependencies / peerDependencies / optionalDependencies の追跡</b> — たどるのは <code>dependencies</code> のみです</li>
     <li><b>peerDependencies / optionalDependencies</b> — 「依存ライブラリ」には含めません（<code>dependencies</code> のみ）</li>
     <li><b>レジストリ以外の依存指定</b> — <code>git+https://…</code>、<code>file:…</code>、<code>github:user/repo</code> などは、lock / node_modules にバージョンが無い場合「取得失敗」になります（行は残ります）</li>
-    <li><b>npm サイト（HTML）と完全に同じ表示の再現</b> — サイトは最新版を表示しています。「npm の最新版」モードで近い内容になりますが、サイト独自の表示（週間ダウンロード数など）は取得しません</li>
-    <li><b>取得済みライブラリの厳密なネスト対応</b> — lock のトップレベル（<code>node_modules/&lt;名前&gt;</code>）を見ます。同じ名前が別バージョンでネストされている場合、トップレベルに同名が無いときだけネストを拾うため、「どの親がどのネスト版を使うか」までは追いません</li>
+    <li><b>npm サイトの Dependencies 欄以外の取得</b> — サイトからは Dependencies 欄の名前だけを取り出します。Dev Dependencies、週間ダウンロード数などは取得しません。また Edge / Chrome が無い環境ではサイト照合はできません（レジストリ側の取得は動きます）</li>
     <li><b>ライセンス本文の確認</b> — package.json に宣言された <code>license</code> の値だけを見ます。LICENSE ファイルの中身や、宣言と実態の食い違いは検出しません。宣言が無いものは <code>UNKNOWN</code> です</li>
     <li><b>認証が必要なプライベートレジストリ</b> — トークン付きの取得には対応していません</li>
     <li><b>モノレポ（workspaces）の横断</b> — 指定したフォルダの package.json だけを対象にします。複数パッケージは個別に実行してください</li>
@@ -182,6 +295,8 @@
     <li><b>結果</b> — テーブルで確認。「NG のみ」フィルタや名前・ライセンスでの絞り込み、依存ライブラリ／取得済みライブラリは件数クリックで展開</li>
     <li><b>再取得</b> — NG 行を「再取得」または「NG をすべて再取得」でやり直す</li>
     <li><b>保存</b> — 完了時・再取得後に自動で CSV 保存。「CSV を保存」で別の場所へ保存し直し、「保存先を開く」でエクスプローラーを開けます</li>
+    <li><b>読み込み</b> — 「CSV を読み込む…」で、このツールが保存した CSV を選ぶと結果表に復元されます（展開・フィルタ・並び・脆弱性リンクも復元）。列が少ない古い CSV も、ある列だけで表示します。
+      読み込んだ結果は元プロジェクトの情報が無いため<b>「再取得」はできません</b>（更新するには同じプロジェクトで「実行」）。「CSV を保存」で別名保存はできます</li>
   </ol>
   <h3>CLI で同じことをする</h3>
   <pre><code>node src/cli.js --project &lt;フォルダ&gt; [--out &lt;CSV&gt;] [--include-dev] [--latest] [--no-cache] [--registry &lt;URL&gt;]</code></pre>
@@ -192,12 +307,15 @@
   <h2>CSV 形式</h2>
   <ul>
     <li>文字コード UTF-8（BOM 付き）、改行 CRLF、RFC 4180 のクォート。Excel でダブルクリックしても日本語ヘッダーが文字化けしません</li>
-    <li>列順: <code>ライブラリ名, バージョン, 依存種別, ライセンス, 依存ライブラリ, 取得済みライブラリ, リポジトリ, 備考</code></li>
-    <li>「依存ライブラリ」「取得済みライブラリ」は 1 セル内に <code>; </code>（セミコロン＋空白）区切り</li>
+    <li>列順: <code>ライブラリ名, バージョン, 依存種別, 深さ, 要求元, ライセンス, 依存ライブラリ, 取得済みライブラリ, npm サイトの dependencies, 一致状態, 脆弱性, 脆弱性の詳細, リポジトリ, 備考</code>
+      （機能番号: ①①①⑤⑤①②③④④⑥⑥①－。CSV のヘッダーには番号を付けていません）</li>
+    <li>「脆弱性の詳細」は 1 セル内に <code>GHSA-ID [深刻度 CVSS] タイトル (影響: 範囲) URL</code> を <code>; </code> 区切り。⑥を使わない設定では「脆弱性」「脆弱性の詳細」は空</li>
+    <li>「依存ライブラリ」「取得済みライブラリ」「npm サイトの dependencies」は 1 セル内に <code>; </code>（セミコロン＋空白）区切り</li>
+    <li>「一致状態」は <code>全一致</code> / <code>不一致</code> / <code>サイト未取得</code>。npm サイトを取得しない設定では空</li>
     <li>取得失敗の行も残ります（ライセンス欄 <code>取得失敗</code>、備考に理由）</li>
   </ul>
-  <pre><code>ライブラリ名,バージョン,依存種別,ライセンス,依存ライブラリ,取得済みライブラリ,リポジトリ,備考
-axios,1.14.0,dependencies,MIT,follow-redirects@^1.15.11; form-data@^4.0.5; proxy-from-env@^2.1.0,follow-redirects@1.15.11; form-data@4.0.5; proxy-from-env@2.1.0,git+https://github.com/axios/axios.git,</code></pre>
+  <pre><code>ライブラリ名,バージョン,依存種別,深さ,要求元,ライセンス,依存ライブラリ,取得済みライブラリ,npm サイトの dependencies,一致状態,脆弱性,脆弱性の詳細,リポジトリ,備考
+axios,1.14.0,dependencies,0,,MIT,follow-redirects@^1.15.11; form-data@^4.0.5; proxy-from-env@^2.1.0,follow-redirects@1.15.11; form-data@4.0.5; proxy-from-env@2.1.0,follow-redirects; form-data; proxy-from-env,全一致,"あり 1 件 (最高 high; high 1)","GHSA-q8qp-cvcw-x6jj [high 7.4] Axios has prototype pollution … (影響: >=1.0.0 <1.15.2) https://github.com/advisories/GHSA-q8qp-cvcw-x6jj",git+https://github.com/axios/axios.git,</code></pre>
 </section>
 
 </main>
