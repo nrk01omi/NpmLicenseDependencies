@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>動作仕様・使い方 — npm ライセンス・依存一覧</title>
+<style>
+  :root { --bg: #f5f6f8; --panel: #fff; --border: #d9dde3; --text: #1f2933; --muted: #6b7280; --accent: #2563eb;
+          --ok: #15803d; --ok-bg: #dcfce7; --ng: #b91c1c; --ng-bg: #fee2e2; --mono: Consolas, "Courier New", monospace; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.7 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif; }
+  header { background: #111827; color: #fff; padding: 12px 20px; position: sticky; top: 0; z-index: 5; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header nav a { color: #bfdbfe; margin-right: 12px; font-size: 12px; text-decoration: none; white-space: nowrap; }
+  header nav a:hover { text-decoration: underline; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px 20px 60px; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 16px; }
+  h2 { font-size: 16px; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 2px solid #e5e7eb; }
+  h3 { font-size: 14px; margin: 16px 0 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0; }
+  th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: #f3f4f6; white-space: nowrap; }
+  code, .mono { font-family: var(--mono); font-size: 12.5px; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 10px 12px; border-radius: 6px; overflow-x: auto; font-size: 12.5px; }
+  pre code { background: none; color: inherit; padding: 0; }
+  ul { padding-left: 22px; margin: 6px 0; }
+  li { margin: 2px 0; }
+  .ok, .ng { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-right: 6px; }
+  .ok { background: var(--ok-bg); color: var(--ok); }
+  .ng { background: var(--ng-bg); color: var(--ng); }
+  .cando li::marker { content: "✔ "; color: var(--ok); }
+  .cannot li::marker { content: "✖ "; color: var(--ng); }
+  .note { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px 12px; margin: 8px 0; font-size: 13px; }
+  .flow { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+  .flow b { color: var(--accent); white-space: nowrap; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>動作仕様・使い方</h1>
+  <nav>
+    <a href="#overview">概要</a>
+    <a href="#columns">列の意味と取得方法</a>
+    <a href="#version">参照バージョン</a>
+    <a href="#cando">できること</a>
+    <a href="#cannot">できないこと</a>
+    <a href="#errors">エラー時の動作</a>
+    <a href="#howto">使い方の流れ</a>
+    <a href="#csv">CSV 形式</a>
+  </nav>
+</header>
+<main>
+
+<section id="overview">
+  <h2>概要</h2>
+  <p>対象プロジェクトの <code>package.json</code> に書かれた<b>直接依存ライブラリ</b>を 1 行ずつ取り上げ、
+  <b>npm レジストリ API</b>（<code>https://registry.npmjs.org</code>、JSON）から「バージョン・ライセンス・依存ライブラリ」を取得して CSV に出力します。
+  npmjs.com の Web ページ（HTML）は読みません。</p>
+  <div class="flow">
+    <b>入力</b><span><code>package.json</code>（必須）、<code>package-lock.json</code>（任意・推奨）、<code>node_modules/</code>（任意）</span>
+    <b>問い合わせ先</b><span><code>GET https://registry.npmjs.org/&lt;ライブラリ名&gt;/&lt;バージョン&gt;</code> — そのバージョンの package.json 相当の JSON が返ります</span>
+    <b>出力</b><span>UTF-8（BOM 付き）の CSV。Excel でそのまま開けます</span>
+  </div>
+  <div class="note">推移的依存（依存の依存…）は展開しません。全体の網羅は CycloneDX の SBOM に任せ、このツールは「直接依存 1 段目の正確な情報」を担当する設計です。</div>
+</section>
+
+<section id="columns">
+  <h2>列の意味と取得方法</h2>
+  <table>
+    <tr><th>列</th><th>取得元と方法</th></tr>
+    <tr><td>ライブラリ名</td><td><code>package.json</code> の <code>dependencies</code>（設定により <code>devDependencies</code> も）のキー。</td></tr>
+    <tr><td>バージョン</td><td>レジストリに問い合わせた<b>正確なバージョン</b>。決め方は <a href="#version">参照バージョン</a> を参照。</td></tr>
+    <tr><td>依存種別</td><td><code>dependencies</code> / <code>devDependencies</code> のどちらに書かれていたか。</td></tr>
+    <tr><td>ライセンス</td><td>レジストリから返った JSON の <code>license</code>。文字列ならそのまま、<code>{ type: "MIT" }</code> 形式なら type、旧形式 <code>licenses: [...]</code> は type を <code>OR</code> で連結。無ければ <code>UNKNOWN</code>、取得できなければ <code>取得失敗</code>。</td></tr>
+    <tr><td><b>依存ライブラリ</b></td><td>
+      レジストリから返った JSON の <code>dependencies</code>（そのライブラリの作者が package.json に書いたもの）。<br>
+      <b>「そのライブラリが要求している範囲」</b>を <code>名前@範囲</code> の形で <code>; </code> 区切りに並べます。<br>
+      例: <code>follow-redirects@^1.15.11; form-data@^4.0.5; proxy-from-env@^2.1.0</code><br>
+      <span class="muted">npm サイトの Dependencies 欄に並ぶ名前と同じ内容です（ただしサイトは最新版を表示。<a href="#version">参照バージョン</a> 参照）。</span>
+    </td></tr>
+    <tr><td><b>取得済みライブラリ</b></td><td>
+      「依存ライブラリ」に出た名前を、<b>対象プロジェクトの <code>package-lock.json</code></b> で引き、
+      <b>「実際にインストールされている 1 つのバージョン」</b>を <code>名前@バージョン</code> の形で並べます。<br>
+      例: <code>follow-redirects@1.15.11; form-data@4.0.5; proxy-from-env@2.1.0</code><br>
+      引く場所: lockfileVersion 2/3 は <code>packages["node_modules/&lt;名前&gt;"].version</code>、v1 は <code>dependencies[&lt;名前&gt;].version</code>。<br>
+      <code>package-lock.json</code> が無いプロジェクトでは<b>空</b>になります。lock に無い名前は備考に <code>lock 未解決: …</code> と出ます。
+    </td></tr>
+    <tr><td>リポジトリ</td><td>レジストリ JSON の <code>repository.url</code>（無ければ <code>homepage</code>）。参考情報。</td></tr>
+    <tr><td>備考</td><td>取得失敗の理由、参照バージョンの補足、lock で引けなかった依存など。</td></tr>
+  </table>
+
+  <h3>「依存ライブラリ」と「取得済みライブラリ」の使い分け</h3>
+  <table>
+    <tr><th></th><th>依存ライブラリ</th><th>取得済みライブラリ</th></tr>
+    <tr><td>意味</td><td>そのライブラリが<b>要求している</b>もの</td><td>あなたの環境に<b>実際に入っている</b>もの</td></tr>
+    <tr><td>出どころ</td><td>npm レジストリ（ライブラリ側の package.json）</td><td>対象プロジェクトの package-lock.json</td></tr>
+    <tr><td>形</td><td><code>名前@^1.2.3</code>（範囲）</td><td><code>名前@1.2.3</code>（固定）</td></tr>
+    <tr><td>向いている用途</td><td>npm サイトとの照合、ライブラリの要求内容の確認</td><td>CycloneDX（<code>pkg:npm/名前@1.2.3</code>）との突き合わせ、配布物の監査</td></tr>
+  </table>
+</section>
+
+<section id="version">
+  <h2>参照バージョン — 何のバージョンを見に行くか</h2>
+  <p>依存ライブラリもライセンスも<b>バージョンごとに変わります</b>。例: <code>axios</code> は 1.16.1 で <code>https-proxy-agent</code> が依存に加わったため、1.14.0 なら 3 件、最新版なら 4 件です。
+  npm サイトのパッケージページは既定で<b>最新版</b>を表示するので、インストール済みと食い違うことがあります（サイトでも <code>/package/axios/v/1.14.0</code> のようにバージョンを指定すれば一致します）。</p>
+  <table>
+    <tr><th>設定</th><th>問い合わせるバージョン</th><th>用途</th></tr>
+    <tr><td>インストール済み（既定）</td><td>
+      <ol style="margin:0;padding-left:20px">
+        <li><code>package-lock.json</code> の <code>node_modules/&lt;名前&gt;</code> の version</li>
+        <li>無ければ <code>node_modules/&lt;名前&gt;/package.json</code> の version</li>
+        <li>それも無ければ、レジストリの全バージョンから package.json の範囲指定を満たす最大のもの（semver）</li>
+        <li>それでも決まらなければ <code>latest</code>（備考に「範囲未解決」と記載）</li>
+      </ol></td>
+      <td>実際に配布・実行しているものの監査。CycloneDX との突き合わせ</td></tr>
+    <tr><td>npm の最新版</td><td>常にレジストリの <code>dist-tags.latest</code>（キャッシュせず毎回取得）。インストール済みと違えば備考に <code>npm 最新版 X を参照 (インストール済みは Y)</code></td>
+      <td>npm サイトの表示と同じ内容を得たいとき</td></tr>
+  </table>
+  <div class="note">最新版モードでは「依存ライブラリ」は最新版の要求、「取得済みライブラリ」は今の lock の中身なので、両者がずれることがあります。lock に無い依存は備考に <code>lock 未解決</code> と出ます（＝最新版に上げると新たに必要になるもの）。</div>
+</section>
+
+<section id="cando">
+  <h2>できること</h2>
+  <ul class="cando">
+    <li>package.json の直接依存ライブラリごとに、バージョン・ライセンス・依存ライブラリ（要求範囲）・取得済みライブラリ（lock の固定バージョン）を 1 行にまとめて CSV 出力</li>
+    <li>devDependencies を含める／含めないの切り替え</li>
+    <li>参照バージョンを「インストール済み」「npm の最新版」から選択</li>
+    <li>スコープ付きパッケージ（<code>@scope/name</code>）の取得</li>
+    <li>lockfileVersion 1 / 2 / 3 の package-lock.json の読み取り</li>
+    <li>レジストリ応答のキャッシュ（<code>.cache/</code>）による高速な再実行。オフラインでも一度取得済みなら完走</li>
+    <li>429 / 5xx / ネットワークエラーの自動リトライ（内部で 3 回）と、それでも失敗したときの確認ダイアログ（<a href="#errors">エラー時の動作</a>）</li>
+    <li>NG 行だけを後から再取得（行単位／一括）。再取得後は CSV を自動で保存し直す</li>
+    <li>社内ミラー等の別レジストリ URL の指定（認証なしのもの）</li>
+    <li>Windows のフォルダ選択／保存ダイアログでの入出力指定</li>
+    <li>CLI（<code>node src/cli.js</code>）での同じ処理の実行（バッチ向け）</li>
+  </ul>
+</section>
+
+<section id="cannot">
+  <h2>できないこと・限界</h2>
+  <ul class="cannot">
+    <li><b>推移的依存の展開</b> — 依存の依存は列挙しません。全体の木は CycloneDX 等の SBOM で確認し、本ツールの「取得済みライブラリ」（<code>名前@バージョン</code>）と突き合わせてください</li>
+    <li><b>peerDependencies / optionalDependencies</b> — 「依存ライブラリ」には含めません（<code>dependencies</code> のみ）</li>
+    <li><b>レジストリ以外の依存指定</b> — <code>git+https://…</code>、<code>file:…</code>、<code>github:user/repo</code> などは、lock / node_modules にバージョンが無い場合「取得失敗」になります（行は残ります）</li>
+    <li><b>npm サイト（HTML）と完全に同じ表示の再現</b> — サイトは最新版を表示しています。「npm の最新版」モードで近い内容になりますが、サイト独自の表示（週間ダウンロード数など）は取得しません</li>
+    <li><b>取得済みライブラリの厳密なネスト対応</b> — lock のトップレベル（<code>node_modules/&lt;名前&gt;</code>）を見ます。同じ名前が別バージョンでネストされている場合、トップレベルに同名が無いときだけネストを拾うため、「どの親がどのネスト版を使うか」までは追いません</li>
+    <li><b>ライセンス本文の確認</b> — package.json に宣言された <code>license</code> の値だけを見ます。LICENSE ファイルの中身や、宣言と実態の食い違いは検出しません。宣言が無いものは <code>UNKNOWN</code> です</li>
+    <li><b>認証が必要なプライベートレジストリ</b> — トークン付きの取得には対応していません</li>
+    <li><b>モノレポ（workspaces）の横断</b> — 指定したフォルダの package.json だけを対象にします。複数パッケージは個別に実行してください</li>
+    <li><b>同時に複数の解析</b> — GUI サーバーは 1 度に 1 ジョブです。実行中に「実行」を押すと拒否されます</li>
+    <li><b>Windows 以外でのネイティブダイアログ</b> — macOS / Linux ではパスを直接入力してください（処理自体は動きます）</li>
+    <li><b>削除・非公開化されたバージョンの取得</b> — レジストリから消えたものは 404 で取得失敗になります</li>
+  </ul>
+</section>
+
+<section id="errors">
+  <h2>エラー時の動作</h2>
+  <p>取得は最大 5 並列で走り、429 / 5xx / ネットワークエラーは内部で 3 回まで自動リトライします。それでも失敗した場合の扱いは設定「エラー時の動作」で決まります。</p>
+  <table>
+    <tr><th>設定</th><th>動作</th></tr>
+    <tr><td>確認ダイアログを表示する（既定）</td><td>失敗するたびにダイアログを出して選択を待ちます。並列で複数失敗しても 1 件ずつ順番に確認します。</td></tr>
+    <tr><td>確認せず自動でリトライする</td><td>「自動リトライ回数」まで待ち時間（1→2→4 秒…）を置いてリトライし、それでも失敗したら NG のまま次へ。</td></tr>
+    <tr><td>確認せず失敗のまま次へ進む</td><td>NG のまま続行（CLI と同じ）。</td></tr>
+  </table>
+  <h3>ダイアログの選択肢</h3>
+  <table>
+    <tr><th>ボタン</th><th>動作</th></tr>
+    <tr><td>1 回リトライ</td><td>その 1 件だけもう一度取得。失敗したら再度確認（試行回数を表示）。</td></tr>
+    <tr><td>以降は確認せず自動でリトライ</td><td>この件と以降の失敗は、自動リトライ回数まで確認なしでリトライ。上限に達したら NG のまま次へ。</td></tr>
+    <tr><td>失敗のまま次へ進む</td><td>その 1 件は NG のまま続行。次の失敗ではまた確認。</td></tr>
+    <tr><td>以降の失敗もすべて無視して続行</td><td>以降は確認せず NG のまま進める。</td></tr>
+  </table>
+  <p>NG になった行は、完了後に結果テーブルの「再取得」（行単位）または「NG をすべて再取得」でやり直せます。再取得はキャッシュを使わず必ずレジストリへ問い合わせ、終わると CSV を保存し直します。</p>
+</section>
+
+<section id="howto">
+  <h2>使い方の流れ</h2>
+  <ol>
+    <li><b>設定</b> — プロジェクトフォルダ（package.json のある場所）と出力 CSV を指定。必要に応じて devDependencies・参照バージョン・エラー時の動作を選ぶ。入力内容はブラウザに記憶され、次回も復元されます</li>
+    <li><b>実行</b> — 「▶ 実行」を押すと進捗バーとログがリアルタイムで進みます。NG が出ると（既定では）確認ダイアログが出ます</li>
+    <li><b>結果</b> — テーブルで確認。「NG のみ」フィルタや名前・ライセンスでの絞り込み、依存ライブラリ／取得済みライブラリは件数クリックで展開</li>
+    <li><b>再取得</b> — NG 行を「再取得」または「NG をすべて再取得」でやり直す</li>
+    <li><b>保存</b> — 完了時・再取得後に自動で CSV 保存。「CSV を保存」で別の場所へ保存し直し、「保存先を開く」でエクスプローラーを開けます</li>
+  </ol>
+  <h3>CLI で同じことをする</h3>
+  <pre><code>node src/cli.js --project &lt;フォルダ&gt; [--out &lt;CSV&gt;] [--include-dev] [--latest] [--no-cache] [--registry &lt;URL&gt;]</code></pre>
+  <p class="muted">CLI は対話できないため、エラー時は「失敗のまま次へ」で動きます。終了コード: 0 = 全件成功、2 = 取得失敗あり（CSV は出力済み）、1 = 実行エラー。</p>
+</section>
+
+<section id="csv">
+  <h2>CSV 形式</h2>
+  <ul>
+    <li>文字コード UTF-8（BOM 付き）、改行 CRLF、RFC 4180 のクォート。Excel でダブルクリックしても日本語ヘッダーが文字化けしません</li>
+    <li>列順: <code>ライブラリ名, バージョン, 依存種別, ライセンス, 依存ライブラリ, 取得済みライブラリ, リポジトリ, 備考</code></li>
+    <li>「依存ライブラリ」「取得済みライブラリ」は 1 セル内に <code>; </code>（セミコロン＋空白）区切り</li>
+    <li>取得失敗の行も残ります（ライセンス欄 <code>取得失敗</code>、備考に理由）</li>
+  </ul>
+  <pre><code>ライブラリ名,バージョン,依存種別,ライセンス,依存ライブラリ,取得済みライブラリ,リポジトリ,備考
+axios,1.14.0,dependencies,MIT,follow-redirects@^1.15.11; form-data@^4.0.5; proxy-from-env@^2.1.0,follow-redirects@1.15.11; form-data@4.0.5; proxy-from-env@2.1.0,git+https://github.com/axios/axios.git,</code></pre>
+</section>
+
+</main>
+</body>
+</html>

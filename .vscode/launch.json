@@ -1,0 +1,65 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "GUI サーバー起動 (http://localhost:3939)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/server.js",
+      "args": ["--port", "3939"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "CLI 実行 (OllamaProxy → npm-dependencies.csv)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/cli.js",
+      "args": [
+        "--project", "c:/Apps/monitor/OllamaProxy",
+        "--out", "${workspaceFolder}/npm-dependencies.csv"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "CLI 実行 (プロジェクトを入力)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/cli.js",
+      "args": [
+        "--project", "${input:projectDir}",
+        "--out", "${input:outCsv}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "テスト実行 (node --test)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--test"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "projectDir",
+      "type": "promptString",
+      "description": "対象プロジェクトのフォルダ（package.json のある場所）",
+      "default": "c:/Apps/monitor/OllamaProxy"
+    },
+    {
+      "id": "outCsv",
+      "type": "promptString",
+      "description": "出力 CSV のパス",
+      "default": "${workspaceFolder}/npm-dependencies.csv"
+    }
+  ]
+}

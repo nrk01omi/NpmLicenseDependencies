@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>npm ライセンス・依存一覧</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #fff; --border: #d9dde3; --text: #1f2933; --muted: #6b7280;
+    --accent: #2563eb; --accent-text: #fff; --ok: #15803d; --ok-bg: #dcfce7; --ng: #b91c1c; --ng-bg: #fee2e2;
+    --wait: #92400e; --wait-bg: #fef3c7; --mono: Consolas, "Courier New", monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "Segoe UI", "Yu Gothic UI", Meiryo, system-ui, sans-serif; }
+  header { background: #111827; color: #fff; padding: 12px 20px; display: flex; align-items: baseline; gap: 16px; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  header span { color: #9ca3af; font-size: 12px; }
+  main { max-width: 1400px; margin: 0 auto; padding: 16px 20px 40px; display: grid; gap: 16px; }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  section h2 { font-size: 15px; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; }
+  .field { display: grid; grid-template-columns: 140px 1fr auto; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .field label { color: var(--muted); }
+  input[type=text] { width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-family: var(--mono); font-size: 13px; }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { padding: 7px 14px; border: 1px solid var(--border); background: #fff; border-radius: 6px; font: inherit; cursor: pointer; white-space: nowrap; }
+  button:hover:not(:disabled) { background: #f3f4f6; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; padding: 9px 22px; }
+  button.primary:hover:not(:disabled) { background: #1d4ed8; }
+  button.danger { color: var(--ng); border-color: #fca5a5; }
+  button.danger:hover:not(:disabled) { background: var(--ng-bg); }
+  button.small { padding: 3px 10px; font-size: 12px; }
+  .options { display: flex; gap: 20px; align-items: center; margin: 4px 0 12px 148px; color: var(--muted); }
+  .options label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .actions { display: flex; gap: 10px; align-items: center; margin-left: 148px; }
+  .error { color: var(--ng); background: var(--ng-bg); border: 1px solid #fca5a5; padding: 8px 12px; border-radius: 6px; margin-top: 10px; white-space: pre-wrap; }
+  .error:empty { display: none; }
+
+  .badge { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.idle { background: #e5e7eb; color: #374151; }
+  .badge.running, .badge.retry { background: #dbeafe; color: #1e40af; }
+  .badge.done, .badge.ok { background: var(--ok-bg); color: var(--ok); }
+  .badge.error, .badge.ng { background: var(--ng-bg); color: var(--ng); }
+  .badge.wait { background: var(--wait-bg); color: var(--wait); }
+  .progress { height: 14px; background: #e5e7eb; border-radius: 7px; overflow: hidden; margin: 8px 0; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .progress.done > div { background: var(--ok); }
+  .counters { display: flex; gap: 24px; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
+  .counters b { color: var(--text); font-size: 15px; }
+  .counters .ng b { color: var(--ng); }
+  .log { margin-top: 10px; background: #0f172a; color: #cbd5e1; font-family: var(--mono); font-size: 12px; padding: 10px 12px; border-radius: 6px; height: 160px; overflow: auto; white-space: pre; }
+  .log .ng { color: #fca5a5; }
+  details.logwrap summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .toolbar .spacer { flex: 1; }
+  .toolbar .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .toolbar .seg button { border: 0; border-radius: 0; }
+  .toolbar .seg button.active { background: var(--accent); color: #fff; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+  th { background: #f3f4f6; position: sticky; top: 0; font-weight: 600; white-space: nowrap; }
+  tr.ng td { background: #fff7f7; }
+  tr.pending td { color: var(--muted); }
+  td.mono, .mono { font-family: var(--mono); font-size: 12px; }
+  td.name { font-weight: 600; white-space: nowrap; }
+  td.note { color: var(--muted); max-width: 320px; }
+  tr.ng td.note { color: var(--ng); }
+  details.deps summary { cursor: pointer; color: var(--accent); white-space: nowrap; }
+  details.deps ul { margin: 6px 0 0; padding-left: 18px; columns: 2; column-gap: 24px; }
+  details.deps li { font-family: var(--mono); font-size: 12px; break-inside: avoid; }
+  details.deps .resolved { color: var(--muted); }
+  a { color: var(--accent); }
+  .speclink { padding: 0; }
+  .speclink a { display: block; padding: 14px 16px; color: inherit; text-decoration: none; border-radius: 8px; }
+  .speclink a:hover { background: #eef2ff; }
+  .speclink h2 { margin: 0 0 4px; color: var(--accent); }
+  .speclink .ext { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .speclink p { margin: 0; color: var(--muted); font-size: 13px; }
+  th[title] { cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+  .empty { padding: 30px; text-align: center; color: var(--muted); }
+  .saved { color: var(--muted); font-size: 12px; }
+  input[type=number] { width: 60px; padding: 5px 6px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+  select { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: #fff; }
+
+  /* エラー確認ダイアログ */
+  .overlay { position: fixed; inset: 0; background: rgba(17, 24, 39, .55); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .overlay[hidden] { display: none; }
+  .dialog { background: #fff; border-radius: 10px; width: min(640px, 92vw); box-shadow: 0 20px 60px rgba(0,0,0,.35); padding: 20px 24px; }
+  .dialog h3 { margin: 0 0 12px; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+  .dialog .detail { background: #fff7f7; border: 1px solid #fca5a5; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px; }
+  .dialog .detail dt { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .dialog .detail dt:first-child { margin-top: 0; }
+  .dialog .detail dd { margin: 0; word-break: break-all; }
+  .dialog .choices { display: grid; gap: 8px; }
+  .dialog .choices button { text-align: left; padding: 10px 14px; display: grid; gap: 2px; }
+  .dialog .choices button b { font-size: 14px; }
+  .dialog .choices button span { color: var(--muted); font-size: 12px; }
+  .dialog .choices button.primary span { color: #dbeafe; }
+</style>
+</head>
+<body>
+<header>
+  <h1>npm ライセンス・依存ライブラリ一覧</h1>
+  <span>package.json の直接依存を npm レジストリから取得して CSV 出力</span>
+</header>
+<main>
+  <section id="spec" class="speclink">
+    <a href="/spec" id="openSpec" target="nld-spec">
+      <h2>0. 動作仕様・使い方（できること・できないこと） <span class="ext">別ウィンドウで開く ↗</span></h2>
+      <p>「依存ライブラリ」「取得済みライブラリ」の取得方法、参照バージョンの決め方、ツールの限界をまとめています。作業中に横に置いて確認できます。</p>
+    </a>
+  </section>
+
+  <section id="settings">
+    <h2>1. 設定</h2>
+    <div class="field">
+      <label for="project">プロジェクトフォルダ</label>
+      <input type="text" id="project" placeholder="package.json のあるフォルダ（例: C:\Apps\monitor\OllamaProxy）">
+      <button id="browseProject">参照…</button>
+    </div>
+    <div class="field">
+      <label for="out">出力 CSV</label>
+      <input type="text" id="out" placeholder="未指定なら <プロジェクト>\npm-dependencies.csv">
+      <button id="browseOut">参照…</button>
+    </div>
+    <div class="options">
+      <label><input type="checkbox" id="includeDev"> devDependencies も含める</label>
+      <label><input type="checkbox" id="useCache" checked> レジストリ応答のキャッシュを使う</label>
+      <label>レジストリ URL <input type="text" id="registry" placeholder="https://registry.npmjs.org" style="width:260px"></label>
+    </div>
+    <div class="options">
+      <label>参照バージョン
+        <select id="versionMode">
+          <option value="installed">インストール済み（package-lock / node_modules）</option>
+          <option value="latest">npm の最新版（npm サイトの表示と同じ）</option>
+        </select>
+      </label>
+    </div>
+    <div class="options">
+      <label>エラー時の動作
+        <select id="errorPolicy">
+          <option value="ask">確認ダイアログを表示する</option>
+          <option value="auto">確認せず自動でリトライする</option>
+          <option value="ignore">確認せず失敗のまま次へ進む</option>
+        </select>
+      </label>
+      <label>自動リトライ回数 <input type="number" id="autoRetries" min="1" max="10" value="3"> 回</label>
+    </div>
+    <div class="actions">
+      <button class="primary" id="run">▶ 実行</button>
+      <span id="runHint" class="saved"></span>
+    </div>
+    <div class="error" id="settingsError"></div>
+  </section>
+
+  <section id="status">
+    <h2>2. 実行状況 <span class="badge idle" id="statusBadge">待機中</span></h2>
+    <div class="progress" id="progress"><div></div></div>
+    <div class="counters">
+      <span>完了 <b id="cCompleted">0</b> / <b id="cTotal">0</b></span>
+      <span>OK <b id="cOk">0</b></span>
+      <span class="ng">NG <b id="cNg">0</b></span>
+      <span>経過 <b id="cElapsed">–</b></span>
+      <span id="cStats"></span>
+    </div>
+    <details class="logwrap" open>
+      <summary>ログ</summary>
+      <div class="log" id="log"></div>
+    </details>
+    <div class="error" id="jobError"></div>
+  </section>
+
+  <section id="results">
+    <h2>3. 結果</h2>
+    <div class="toolbar">
+      <span class="seg">
+        <button data-filter="all" class="active">すべて</button>
+        <button data-filter="ng">NG のみ</button>
+        <button data-filter="ok">OK のみ</button>
+      </span>
+      <input type="text" id="search" placeholder="ライブラリ名 / ライセンスで絞り込み" style="width:260px">
+      <span id="rowCount" class="saved"></span>
+      <span class="spacer"></span>
+      <button class="danger" id="retryAll" disabled>NG をすべて再取得</button>
+      <button id="save" disabled>CSV を保存</button>
+      <button id="openFolder" disabled>保存先を開く</button>
+    </div>
+    <div class="saved" id="savedInfo"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>状態</th><th>ライブラリ名</th><th>バージョン</th><th>種別</th><th>ライセンス</th>
+          <th title="npm レジストリ上の、そのライブラリの package.json に書かれた dependencies（要求している範囲。name@^1.2.3 の形）">依存ライブラリ</th>
+          <th title="同じ名前を、対象プロジェクトの package-lock.json で引いた、実際にインストールされている 1 つのバージョン（name@1.2.3 の形）。lock が無ければ空">取得済みライブラリ</th>
+          <th>リポジトリ</th><th>備考</th><th>操作</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty">まだ結果がありません。設定を入力して「実行」を押してください。</div>
+    </div>
+    <div class="error" id="resultsError"></div>
+  </section>
+</main>
+
+<div class="overlay" id="errorDialog" hidden role="dialog" aria-modal="true" aria-labelledby="errorDialogTitle">
+  <div class="dialog">
+    <h3 id="errorDialogTitle"><span class="badge ng">NG</span> 取得に失敗しました。どうしますか？</h3>
+    <dl class="detail">
+      <dt>ライブラリ</dt><dd class="mono" id="edName"></dd>
+      <dt>エラー内容</dt><dd id="edMessage"></dd>
+      <dt>試行回数</dt><dd id="edAttempt"></dd>
+    </dl>
+    <div class="choices">
+      <button class="primary" data-decision="retry"><b>1 回リトライ</b><span>この 1 件だけ、もう一度取得を試みます。失敗したら再度確認します。</span></button>
+      <button data-decision="auto"><b>以降は確認せず自動でリトライ</b><span id="edAutoDesc">この件と以降の失敗は、最大 3 回まで自動でリトライします（待ち時間あり）。それでも失敗した場合は失敗のまま次へ進みます。</span></button>
+      <button data-decision="ignore"><b>失敗のまま次へ進む</b><span>この 1 件は NG のままにして続行します。次の失敗ではまた確認します。</span></button>
+      <button data-decision="ignore-all"><b>以降の失敗もすべて無視して続行</b><span>これ以降は確認せずに NG のまま進めます。完了後に「再取得」でまとめてやり直せます。</span></button>
+    </div>
+    <div class="saved" style="margin-top:10px">迷ったら <a href="/spec#errors" target="nld-spec">動作仕様（エラー時の動作）</a> を別ウィンドウで確認できます。</div>
+    <div class="error" id="dialogError"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    project: $('project'), out: $('out'), includeDev: $('includeDev'), useCache: $('useCache'), registry: $('registry'),
+    browseProject: $('browseProject'), browseOut: $('browseOut'),
+    run: $('run'), runHint: $('runHint'), settingsError: $('settingsError'),
+    statusBadge: $('statusBadge'), progress: $('progress'), cCompleted: $('cCompleted'), cTotal: $('cTotal'),
+    cOk: $('cOk'), cNg: $('cNg'), cElapsed: $('cElapsed'), cStats: $('cStats'), log: $('log'), jobError: $('jobError'),
+    search: $('search'), rowCount: $('rowCount'), retryAll: $('retryAll'), save: $('save'), openFolder: $('openFolder'),
+    savedInfo: $('savedInfo'), tbody: $('tbody'), empty: $('empty'), resultsError: $('resultsError'),
+    errorPolicy: $('errorPolicy'), autoRetries: $('autoRetries'), versionMode: $('versionMode'),
+    errorDialog: $('errorDialog'), edName: $('edName'), edMessage: $('edMessage'), edAttempt: $('edAttempt'),
+    edAutoDesc: $('edAutoDesc'), dialogError: $('dialogError'),
+  };
+
+  let state = null;
+  let filter = 'all';
+  const openDeps = new Set(); // 展開中の依存一覧（ライブラリ名）
+  let busy = false;
+
+  // ---- 設定の保存/復元（ブラウザ内のみ）
+  try {
+    const saved = JSON.parse(localStorage.getItem('nld.settings') || '{}');
+    if (saved.project) els.project.value = saved.project;
+    if (saved.out) els.out.value = saved.out;
+    if (saved.includeDev) els.includeDev.checked = true;
+    if (saved.useCache === false) els.useCache.checked = false;
+    if (saved.registry) els.registry.value = saved.registry;
+    if (saved.errorPolicy) els.errorPolicy.value = saved.errorPolicy;
+    if (saved.autoRetries) els.autoRetries.value = saved.autoRetries;
+    if (saved.versionMode) els.versionMode.value = saved.versionMode;
+  } catch {}
+  function persist() {
+    try {
+      localStorage.setItem('nld.settings', JSON.stringify({
+        project: els.project.value, out: els.out.value, includeDev: els.includeDev.checked,
+        useCache: els.useCache.checked, registry: els.registry.value,
+        errorPolicy: els.errorPolicy.value, autoRetries: els.autoRetries.value, versionMode: els.versionMode.value,
+      }));
+    } catch {}
+  }
+
+  // ---- API
+  async function api(path, body) {
+    const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+  async function withBusy(button, errorEl, fn) {
+    if (busy) return;
+    busy = true;
+    errorEl.textContent = '';
+    button.disabled = true;
+    try { await fn(); }
+    catch (err) { errorEl.textContent = err.message; }
+    finally { busy = false; button.disabled = false; render(); }
+  }
+
+  els.browseProject.onclick = () => withBusy(els.browseProject, els.settingsError, async () => {
+    const r = await api('/api/dialog/folder', { initial: els.project.value });
+    if (r.path) { els.project.value = r.path; persist(); }
+  });
+  els.browseOut.onclick = () => withBusy(els.browseOut, els.settingsError, async () => {
+    const r = await api('/api/dialog/save', { initial: els.out.value || (els.project.value ? els.project.value + '\\npm-dependencies.csv' : '') });
+    if (r.path) { els.out.value = r.path; persist(); }
+  });
+  els.run.onclick = () => withBusy(els.run, els.settingsError, async () => {
+    persist();
+    await api('/api/run', {
+      project: els.project.value, out: els.out.value, includeDev: els.includeDev.checked,
+      useCache: els.useCache.checked, registry: els.registry.value,
+      errorPolicy: els.errorPolicy.value, autoRetries: Number(els.autoRetries.value) || 3,
+      versionMode: els.versionMode.value,
+    });
+  });
+  // エラー確認ダイアログの選択 → サーバーへ通知（サーバー側で待っている取得処理が再開する）
+  let deciding = false;
+  els.errorDialog.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('button[data-decision]');
+    if (!btn || deciding) return;
+    deciding = true;
+    els.dialogError.textContent = '';
+    for (const b of els.errorDialog.querySelectorAll('button')) b.disabled = true;
+    try { await api('/api/error-decision', { action: btn.dataset.decision }); }
+    catch (err) { els.dialogError.textContent = err.message; }
+    finally {
+      deciding = false;
+      for (const b of els.errorDialog.querySelectorAll('button')) b.disabled = false;
+    }
+  });
+  els.retryAll.onclick = () => withBusy(els.retryAll, els.resultsError, () => api('/api/retry', { all: true }));
+  els.save.onclick = () => withBusy(els.save, els.resultsError, async () => {
+    let out = els.out.value;
+    if (!out) {
+      const r = await api('/api/dialog/save', { initial: state && state.out });
+      if (!r.path) return;
+      out = r.path; els.out.value = out; persist();
+    }
+    await api('/api/save', { out });
+  });
+  els.openFolder.onclick = () => withBusy(els.openFolder, els.resultsError, () => api('/api/open'));
+  for (const b of document.querySelectorAll('.seg button')) {
+    b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('active', x === b)); renderTable(); };
+  }
+  els.search.oninput = renderTable;
+  // 仕様ページは常に同じ名前のウィンドウで開き、既に開いていればそれを前面に出す
+  for (const a of document.querySelectorAll('a[target="nld-spec"]')) {
+    a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const w = window.open(a.href, 'nld-spec', 'width=960,height=900,scrollbars=yes,resizable=yes');
+      if (w) w.focus();
+    });
+  }
+  for (const el of [els.project, els.out, els.includeDev, els.useCache, els.registry, els.errorPolicy, els.autoRetries, els.versionMode]) el.addEventListener('change', persist);
+  els.tbody.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-retry]');
+    if (btn) withBusy(btn, els.resultsError, () => api('/api/retry', { indices: [Number(btn.dataset.retry)] }));
+  });
+  els.tbody.addEventListener('toggle', (ev) => {
+    const d = ev.target;
+    if (d.matches('details.deps')) { if (d.open) openDeps.add(d.dataset.name); else openDeps.delete(d.dataset.name); }
+  }, true);
+
+  // ---- SSE
+  function connect() {
+    const es = new EventSource('/api/events');
+    es.onmessage = (ev) => { state = JSON.parse(ev.data); render(); };
+    es.onerror = () => { els.jobError.textContent = 'サーバーとの接続が切れました。再接続しています…'; };
+    es.onopen = () => { els.jobError.textContent = ''; };
+  }
+  connect();
+  setInterval(() => { if (state && state.status === 'running') renderElapsed(); }, 1000);
+
+  // ---- 描画
+  function esc(s) { return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  function fmtTime(iso) { return iso ? new Date(iso).toLocaleTimeString('ja-JP') : ''; }
+  function renderElapsed() {
+    if (!state || !state.startedAt) { els.cElapsed.textContent = '–'; return; }
+    const end = state.finishedAt ? new Date(state.finishedAt) : new Date();
+    els.cElapsed.textContent = ((end - new Date(state.startedAt)) / 1000).toFixed(1) + ' 秒';
+  }
+
+  function render() {
+    if (!state) return;
+    const rows = state.rows.filter(Boolean);
+    const ok = rows.filter((r) => r.ok).length;
+    const ng = rows.length - ok;
+    const running = state.status === 'running';
+    const retrying = state.retrying.length > 0;
+
+    const badge = { idle: ['idle', '待機中'], running: ['running', '実行中'], done: ['done', '完了'], error: ['error', 'エラー'] }[state.status];
+    const waiting = Boolean(state.pending);
+    els.statusBadge.className = 'badge ' + (waiting ? 'wait' : retrying ? 'retry' : badge[0]);
+    els.statusBadge.textContent = waiting ? '確認待ち' : retrying ? '再取得中' : badge[1];
+
+    // エラー確認ダイアログ
+    if (waiting) {
+      els.edName.textContent = `${state.pending.name}@${state.pending.version}`;
+      els.edMessage.textContent = state.pending.message;
+      els.edAttempt.textContent = `${state.pending.attempt} 回目`;
+      els.edAutoDesc.textContent = `この件と以降の失敗は、最大 ${state.autoRetries} 回まで自動でリトライします（待ち時間あり）。それでも失敗した場合は失敗のまま次へ進みます。`;
+    }
+    els.errorDialog.hidden = !waiting;
+    els.progress.classList.toggle('done', state.status === 'done');
+    els.progress.firstElementChild.style.width = state.total ? (state.completed / state.total * 100) + '%' : '0';
+    els.cCompleted.textContent = state.completed;
+    els.cTotal.textContent = state.total;
+    els.cOk.textContent = ok;
+    els.cNg.textContent = ng;
+    els.cStats.textContent = state.stats ? `レジストリ要求 ${state.stats.requests} 回 / キャッシュ ${state.stats.cacheHits} 件` : '';
+    renderElapsed();
+    els.jobError.textContent = state.error || '';
+    els.runHint.textContent = state.project ? `対象: ${state.project}` : '';
+
+    const atBottom = els.log.scrollTop + els.log.clientHeight >= els.log.scrollHeight - 4;
+    els.log.innerHTML = state.log.map((l) => `<div class="${/  NG  |エラー|失敗/.test(l) ? 'ng' : ''}">${esc(l)}</div>`).join('');
+    if (atBottom) els.log.scrollTop = els.log.scrollHeight;
+
+    els.run.disabled = busy || running || retrying;
+    els.retryAll.disabled = busy || running || retrying || ng === 0;
+    els.save.disabled = busy || running || retrying || rows.length === 0;
+    els.openFolder.disabled = !state.savedAt;
+    els.savedInfo.textContent = state.savedAt ? `CSV 保存済み (${fmtTime(state.savedAt)}): ${state.out}` : (state.out ? `保存先: ${state.out}` : '');
+    renderTable();
+  }
+
+  function renderTable() {
+    if (!state) return;
+    const q = els.search.value.trim().toLowerCase();
+    const retrying = new Set(state.retrying);
+    const items = state.rows.map((row, index) => ({ row, index })).filter(({ row }) => {
+      if (filter === 'ng' && (!row || row.ok)) return false;
+      if (filter === 'ok' && (!row || !row.ok)) return false;
+      if (q && row && !(row.name.toLowerCase().includes(q) || row.license.toLowerCase().includes(q))) return false;
+      return true;
+    });
+    els.empty.hidden = state.rows.length > 0;
+    els.rowCount.textContent = state.rows.length ? `${items.length} / ${state.rows.length} 件を表示` : '';
+    const locked = busy || state.status === 'running' || retrying.size > 0;
+
+    els.tbody.innerHTML = items.map(({ row, index }) => {
+      if (!row) return `<tr class="pending"><td><span class="badge wait">取得中</span></td><td colspan="9">…</td></tr>`;
+      const isRetry = retrying.has(index);
+      const status = isRetry ? '<span class="badge retry">再取得中</span>' : row.ok ? '<span class="badge ok">OK</span>' : '<span class="badge ng">NG</span>';
+      const depList = (key, list) => list.length
+        ? `<details class="deps" data-name="${esc(key + ':' + row.name)}" ${openDeps.has(key + ':' + row.name) ? 'open' : ''}><summary>${list.length} 件</summary><ul>${
+            list.map((d) => `<li>${esc(d)}</li>`).join('')}</ul></details>`
+        : (row.ok ? '<span class="saved">なし</span>' : '');
+      const deps = depList('req', row.dependencies);
+      const fetched = depList('got', row.dependenciesResolved);
+      const repo = row.repository ? `<a class="mono" href="${esc(repoLink(row.repository))}" target="_blank" rel="noopener">${esc(row.repository.replace(/^git\+/, ''))}</a>` : '';
+      return `<tr class="${row.ok ? 'ok' : 'ng'}">
+        <td>${status}</td>
+        <td class="name">${esc(row.name)}</td>
+        <td class="mono">${esc(row.version)}</td>
+        <td>${esc(row.depType)}</td>
+        <td>${esc(row.license)}</td>
+        <td>${deps}</td>
+        <td>${fetched}</td>
+        <td>${repo}</td>
+        <td class="note">${esc(row.note)}</td>
+        <td><button class="small" data-retry="${index}" ${locked ? 'disabled' : ''}>再取得</button></td>
+      </tr>`;
+    }).join('');
+  }
+  function repoLink(url) {
+    return url.replace(/^git\+/, '').replace(/^git:\/\//, 'https://').replace(/^ssh:\/\/git@/, 'https://').replace(/\.git$/, '');
+  }
+})();
+</script>
+</body>
+</html>
