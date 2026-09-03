@@ -19,6 +19,8 @@ const USAGE = `使い方: node src/cli.js [--project <dir>] [--out <file.csv>] [
   --out <file>       出力 CSV パス。既定: <project>/npm-dependencies.csv
   --include-dev      devDependencies も対象に含める
   --latest           インストール済みではなく npm の最新版を参照する（npm サイトの表示と同じ）
+  --list <mode>      行のリストの作り方: union（既定。package.json ∪ package-lock.json の OR で網羅）| package-json（package.json 由来のみ。従来どおり）
+  --no-lock          --list package-json と同じ（package-lock.json にしか無いライブラリを行に加えない）
   --recursive        依存ライブラリを再帰的にたどり、推移的依存もすべて行にする。先に再帰調査で件数を出し、確認してから本調査に入る
   --yes              --recursive の件数確認を省略して本調査に進む（バッチ用。端末でない場合は自動で進む）
   --order <o>        CSV の並び順: tree（既定。親子順＝直接依存の直下に子・孫）| depth（深さ順、同じ深さは名前順）
@@ -53,6 +55,8 @@ export async function run(argv) {
       out: { type: 'string' },
       'include-dev': { type: 'boolean', default: false },
       latest: { type: 'boolean', default: false },
+      list: { type: 'string' },
+      'no-lock': { type: 'boolean', default: false },
       recursive: { type: 'boolean', default: false },
       yes: { type: 'boolean', default: false },
       order: { type: 'string', default: 'tree' },
@@ -76,6 +80,9 @@ export async function run(argv) {
   const siteWaitMs = parseWaitSeconds(values['site-wait']);
   const siteEngine = values['site-engine'];
   if (!SITE_ENGINES.includes(siteEngine)) throw new Error(`--site-engine は ${SITE_ENGINES.join(' | ')} のいずれかを指定してください: ${siteEngine}`);
+  const listArg = values.list ?? (values['no-lock'] ? 'package-json' : 'union');
+  if (!['union', 'package-json'].includes(listArg)) throw new Error(`--list は union | package-json のいずれかを指定してください: ${listArg}`);
+  const listMode = listArg === 'union' ? 'union' : 'packageJson';
   const order = values.order;
   if (!ROW_ORDERS.includes(order)) throw new Error(`--order は ${ROW_ORDERS.join(' | ')} のいずれかを指定してください: ${order}`);
 
@@ -93,11 +100,12 @@ export async function run(argv) {
     siteWaitMs,
     siteEngine,
     recursive: values.recursive,
+    listMode,
     useVulns: !values['no-vulns'],
     onStart: ({ project, deps }) => {
       outPath ??= path.join(project.root, 'npm-dependencies.csv');
       process.stderr.write(
-        `対象: ${project.root}\n直接依存 ${deps.length} 件 (lock: ${project.lock ? 'あり' : 'なし'}, 参照: ${values.latest ? 'npm 最新版' : 'インストール済み'}, npm サイト照合: ${useSite ? `あり (${siteEngine})` : 'なし'}, 再帰: ${values.recursive ? 'あり' : 'なし'})\n`,
+        `対象: ${project.root}\n直接依存 ${deps.length} 件 (lock: ${project.lock ? 'あり' : 'なし'}, 参照: ${values.latest ? 'npm 最新版' : 'インストール済み'}, npm サイト照合: ${useSite ? `あり (${siteEngine})` : 'なし'}, 再帰: ${values.recursive ? 'あり' : 'なし'}, リスト: ${listMode === 'union' ? 'package.json ∪ package-lock.json' : 'package.json のみ'})\n`,
       );
       if (values.recursive) process.stderr.write('再帰調査を開始します（依存ライブラリをたどって推移的依存を列挙）…\n');
     },
@@ -106,7 +114,7 @@ export async function run(argv) {
     },
     onDiscovered: async ({ summary }) => {
       process.stderr.write(
-        `再帰調査 完了: 合計 ${summary.total} 件 (直接 ${summary.direct} 件, 推移的 ${summary.transitive} 件, 最大深さ ${summary.maxDepth}, lock で決定 ${summary.fromLock} 件, 解決不能 ${summary.unresolved} 件, 取得失敗 ${summary.failed} 件)\n`,
+        `再帰調査 完了: 合計 ${summary.total} 件 (直接 ${summary.direct} 件, 推移的 ${summary.transitive} 件, lock のみ ${summary.lockOnly ?? 0} 件, 最大深さ ${summary.maxDepth}, lock で決定 ${summary.fromLock} 件, 解決不能 ${summary.unresolved} 件, 取得失敗 ${summary.failed} 件)\n`,
       );
       if (useSite) {
         const avgWaitSec = ((siteWaitMs?.min ?? DEFAULT_WAIT_MS.min) + (siteWaitMs?.max ?? DEFAULT_WAIT_MS.max)) / 2000;

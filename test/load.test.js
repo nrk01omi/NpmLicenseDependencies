@@ -130,7 +130,8 @@ test('rowsFromCsv: 古い形式（列が少ない）でも、ある列だけで�
   const oldHeader = ['ライブラリ名', 'バージョン', '依存種別', 'ライセンス', '依存ライブラリ', '取得済みライブラリ', 'リポジトリ', '備考'];
   const text = toCsv(oldHeader, [['axios', '1.14.0', 'dependencies', 'MIT', 'a@^1; b@^2', 'a@1.0.0', 'repo', '']]);
   const { rows, missing } = rowsFromCsv(text);
-  assert.deepEqual(missing, ['深さ', '要求元', 'npm サイトの dependencies', '一致状態', '脆弱性', '脆弱性の詳細']);
+  assert.deepEqual(missing, ['取得元', '深さ', '要求元', 'npm サイトの dependencies', '一致状態', '脆弱性', '脆弱性の詳細']);
+  assert.equal(rows[0].source, 'package.json');
   assert.equal(rows[0].depth, 0);
   assert.deepEqual(rows[0].dependencies, ['a@^1', 'b@^2']);
   assert.equal(rows[0].siteStatus, 'skipped');

@@ -12,7 +12,7 @@ CycloneDX の SBOM は重複パッケージを 1 ノードにまとめるため�
 
 | 番号 | 機能 | 結果表の列 | 設定 / CLI |
 |---|---|---|---|
-| ① | 基本取得（npm レジストリ API） | ライブラリ名・バージョン・種別・ライセンス・リポジトリ | プロジェクト、出力 CSV、`--include-dev`、`--latest`、`--no-cache`、`--registry` |
+| ① | 基本取得（npm レジストリ API） | ライブラリ名・バージョン・種別・取得元・ライセンス・リポジトリ | プロジェクト、出力 CSV、`--include-dev`、`--latest`、`--list`、`--no-cache`、`--registry` |
 | ② | 依存ライブラリ | 依存ライブラリ（package.json から求まる dependencies） | なし |
 | ③ | 取得済みライブラリ | 取得済みライブラリ（package-lock.json で取得したバージョン） | なし |
 | ④ | npm サイト照合 | npm サイトの dependencies、一致状態 | `--no-site`、`--site-wait`、`--site-engine`、`--browser`、`--no-site-cache` |
@@ -87,6 +87,8 @@ node src/cli.js --project <対象プロジェクトのディレクトリ> [--out
 | `--out <file>` | 出力 CSV。既定は `<project>/npm-dependencies.csv` |
 | `--include-dev` | `devDependencies` も対象に含める（既定は `dependencies` のみ） |
 | `--latest` | インストール済みではなく npm の最新版を参照する（npm サイトの表示と同じ） |
+| `--list <mode>` | 行のリストの作り方。`union`（既定。`package.json` ∪ `package-lock.json` の OR で網羅）または `package-json`（`package.json` 由来のみ。この機能を入れる前と同じ動き） |
+| `--no-lock` | `--list package-json` と同じ |
 | `--recursive` | 依存ライブラリを再帰的にたどり、推移的依存もすべて行にする。先に再帰調査で件数を表示し、端末なら `y/N` で確認してから本調査に入る |
 | `--yes` | `--recursive` の件数確認を省略して本調査に進む（バッチ用。端末でない場合は自動で進む）。中止した場合の終了コードは `3` |
 | `--order <o>` | CSV の並び順。`tree`（既定。親子順＝直接依存の直下に子・孫を名前順で深さ優先。複数の親を持つ行は最初の位置に 1 回だけ）または `depth`（深さ順、同じ深さは名前順） |
@@ -189,6 +191,32 @@ node src/cli.js --project <dir> --recursive --yes --no-site   # 確認なし・�
 ```
 
 たどるのは `dependencies` のみで、`devDependencies` / `peerDependencies` / `optionalDependencies` は追いません。
+そのため再帰調査だけでは取りこぼしが出ますが、次の「リストの作り方」で `package-lock.json` 側から補います。
+
+### リストの作り方（package.json ∪ package-lock.json）
+
+行のリストの作り方は 2 つから選べます（GUI 設定「リストの作り方」／CLI `--list`）。
+
+| 選択 | 動き |
+|---|---|
+| **`package.json` ∪ `package-lock.json`（OR で網羅）**（既定 / `--list union`） | 下の表の両方を拾う和集合。実際にインストールされているライブラリを取りこぼしません |
+| `package.json` のみ（従来どおり）（`--list package-json`、`--no-lock`） | この機能を入れる前と同じ。直接依存（＋再帰調査でたどれた推移的依存）だけ |
+
+OR のときに拾うものは次のとおりです。
+
+| 由来 | 拾うもの |
+|---|---|
+| `package.json` | 直接依存（`dependencies`、`--include-dev` なら `devDependencies` も）と、再帰調査でたどれた推移的依存 |
+| `package-lock.json` | ルート（`packages[""]`）に記録された直接依存（`optionalDependencies` を含む）と、lock に実体があるすべてのパッケージ |
+
+`package.json` 側からはたどれないもの（`peerDependencies` / `optionalDependencies` 由来、
+範囲を解決できなかったもの、ネストされた別バージョンなど）も lock 側から拾うので、実際にインストールされている
+ライブラリを取りこぼしません。どちらの由来かは「取得元」列で分かります。
+
+- 重複は `name@version`（非再帰のときは名前）で 1 行にまとめ、両方にあれば取得元は `両方`
+- lock にしかない行は、深さ＝lock 上のネストの深さ、要求元は空（依存グラフ上の親が分からないため）、備考に lock 上の位置
+- `--include-dev` を付けないときは、lock 側の `dev` / `devOptional` 扱いのパッケージは加えません
+- 非再帰（`--recursive` なし）でも lock 上のパッケージはすべて行になるため、行数は lock の規模になります（件数を抑えたいときは `--list package-json`）
 
 ## CSV の列
 
@@ -196,7 +224,8 @@ node src/cli.js --project <dir> --recursive --yes --no-site   # 確認なし・�
 |---|---|
 | ライブラリ名 | 直接依存のパッケージ名 |
 | バージョン | レジストリに問い合わせた正確なバージョン |
-| 依存種別 | `dependencies` / `devDependencies`。再帰調査で見つかった推移的依存は `transitive` |
+| 依存種別 | `dependencies` / `devDependencies`。再帰調査で見つかった推移的依存や、lock にしか無いものは `transitive` |
+| 取得元 | その行がどちらのリストから来たか。`両方` / `package.json`（lock に無い） / `package-lock.json`（package.json からはたどれない） |
 | 深さ | 直接依存は `0`。推移的依存は直接依存から何段たどったか（再帰調査のときのみ 1 以上） |
 | 要求元 | このライブラリを要求しているライブラリ（`name@version`、`; ` 区切り）。再帰調査のときのみ |
 | ライセンス | `license`（文字列 / `{type}` / 旧形式 `licenses[]` を正規化）。無ければ `UNKNOWN`、取得できなければ `取得失敗` |

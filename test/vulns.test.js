@@ -117,9 +117,9 @@ test('rowToCells: ⑥ の 2 列は 一致状態 の後ろ、リポジトリ の�
   };
   const cells = rowToCells(row);
   assert.equal(cells.length, CSV_HEADER.length);
-  assert.equal(CSV_HEADER[10], '脆弱性');
-  assert.equal(CSV_HEADER[11], '脆弱性の詳細');
-  assert.equal(cells[10], 'あり 1 件 (最高 high; high 1)');
-  assert.equal(cells[11], 'GHSA-1 [high 7.5] A (影響: <2) https://x/1');
-  assert.equal(cells[12], 'r');
+  assert.equal(CSV_HEADER[11], '脆弱性');
+  assert.equal(CSV_HEADER[12], '脆弱性の詳細');
+  assert.equal(cells[11], 'あり 1 件 (最高 high; high 1)');
+  assert.equal(cells[12], 'GHSA-1 [high 7.5] A (影響: <2) https://x/1');
+  assert.equal(cells[13], 'r');
 });

@@ -174,6 +174,12 @@
       </div>
       <div class="options">
         <label><input type="checkbox" id="includeDev"> devDependencies も含める</label>
+        <label title="OR: package.json からたどれるライブラリと package-lock.json に載っているライブラリの和集合で行を作ります（lock にしか無いものも 1 行になります）。package.json のみ: この機能を入れる前と同じ動きです">リストの作り方
+          <select id="listMode">
+            <option value="union">package.json ∪ package-lock.json（OR で網羅）</option>
+            <option value="packageJson">package.json のみ（従来どおり）</option>
+          </select>
+        </label>
         <label title=".cache/<名前>@<版>.json（レジストリ API の応答）"><input type="checkbox" id="useCache" checked> レジストリ応答のキャッシュを使う</label>
         <label>レジストリ URL <input type="text" id="registry" placeholder="https://registry.npmjs.org" style="width:260px"></label>
       </div>
@@ -286,6 +292,7 @@
           <th><span class="num">①</span>ライブラリ名</th>
           <th><span class="num">①</span>バージョン</th>
           <th><span class="num">①</span>種別</th>
+          <th title="その行がどのリストから来たか。package.json（からたどれた）/ package-lock.json（lock にしかない）/ 両方"><span class="num">①</span>取得元<small>package.json / lock</small></th>
           <th title="⑤再帰調査。直接依存は 0。推移的依存は、直接依存から何段たどったか"><span class="num">⑤</span>深さ</th>
           <th title="⑤再帰調査。このライブラリを依存として要求しているライブラリ（name@version）"><span class="num">⑤</span>要求元</th>
           <th><span class="num">①</span>ライセンス</th>
@@ -312,6 +319,7 @@
       <span>合計（本調査の行数）</span><b id="rdTotal">0</b>
       <span>直接依存</span><span id="rdDirect">0</span>
       <span>推移的依存</span><span id="rdTransitive">0</span>
+      <span>package-lock.json のみ</span><span id="rdLockOnly">0</span>
       <span>最大深さ</span><span id="rdDepth">0</span>
       <span>lock で決定 / レジストリで範囲解決</span><span id="rdLock">0 / 0</span>
       <span>解決不能 / 取得失敗</span><span id="rdFailed">0 / 0</span>
@@ -348,7 +356,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const els = {
-    project: $('project'), out: $('out'), includeDev: $('includeDev'), useCache: $('useCache'), registry: $('registry'),
+    project: $('project'), out: $('out'), includeDev: $('includeDev'), listMode: $('listMode'), useCache: $('useCache'), registry: $('registry'),
     browseProject: $('browseProject'), browseOut: $('browseOut'),
     run: $('run'), runHint: $('runHint'), settingsError: $('settingsError'),
     statusBadge: $('statusBadge'), progress: $('progress'), cCompleted: $('cCompleted'), cTotal: $('cTotal'),
@@ -376,6 +384,7 @@
     if (saved.project) els.project.value = saved.project;
     if (saved.out) els.out.value = saved.out;
     if (saved.includeDev) els.includeDev.checked = true;
+    if (saved.listMode) els.listMode.value = saved.listMode;
     if (saved.useCache === false) els.useCache.checked = false;
     if (saved.registry) els.registry.value = saved.registry;
     if (saved.errorPolicy) els.errorPolicy.value = saved.errorPolicy;
@@ -393,7 +402,7 @@
   function persist() {
     try {
       localStorage.setItem('nld.settings', JSON.stringify({
-        project: els.project.value, out: els.out.value, includeDev: els.includeDev.checked,
+        project: els.project.value, out: els.out.value, includeDev: els.includeDev.checked, listMode: els.listMode.value,
         useCache: els.useCache.checked, registry: els.registry.value,
         errorPolicy: els.errorPolicy.value, autoRetries: els.autoRetries.value, versionMode: els.versionMode.value,
         useSite: els.useSite.checked, useSiteCache: els.useSiteCache.checked, siteWaitMin: els.siteWaitMin.value, siteWaitMax: els.siteWaitMax.value, browser: els.browser.value,
@@ -431,6 +440,7 @@
     persist();
     await api('/api/run', {
       project: els.project.value, out: els.out.value, includeDev: els.includeDev.checked,
+      listMode: els.listMode.value,
       useCache: els.useCache.checked, registry: els.registry.value,
       errorPolicy: els.errorPolicy.value, autoRetries: Number(els.autoRetries.value) || 3,
       versionMode: els.versionMode.value,
@@ -567,6 +577,7 @@
       $('rdTotal').textContent = s.total;
       $('rdDirect').textContent = s.direct;
       $('rdTransitive').textContent = s.transitive;
+      $('rdLockOnly').textContent = s.lockOnly ?? 0;
       $('rdDepth').textContent = s.maxDepth;
       $('rdLock').textContent = `${s.fromLock} / ${s.total - s.fromLock - s.failed}`;
       $('rdFailed').textContent = `${s.unresolved} / ${s.failed}`;
@@ -580,7 +591,7 @@
     const d = state.discovery, ds = state.discoverySummary;
     els.discoveryInfo.textContent = !state.recursive ? ''
       : discovering && d ? `再帰調査中: ${d.total} 件を発見（${d.processed} 件を確認済み）`
-      : ds ? `再帰調査: 合計 ${ds.total} 件（直接 ${ds.direct} / 推移的 ${ds.transitive}、最大深さ ${ds.maxDepth}）`
+      : ds ? `再帰調査: 合計 ${ds.total} 件（直接 ${ds.direct} / 推移的 ${ds.transitive}、lock のみ ${ds.lockOnly ?? 0}、最大深さ ${ds.maxDepth}）`
       : '';
 
     // エラー確認ダイアログ
@@ -639,7 +650,7 @@
     const locked = busy || state.status === 'running' || retrying.size > 0 || state.source === 'csv';
 
     els.tbody.innerHTML = items.map(({ row, index, level = 0, dup = false }) => {
-      if (!row) return `<tr class="pending"><td><span class="badge wait">取得中</span></td><td colspan="15">…</td></tr>`;
+      if (!row) return `<tr class="pending"><td><span class="badge wait">取得中</span></td><td colspan="16">…</td></tr>`;
       const isRetry = retrying.has(index);
       const status = isRetry ? '<span class="badge retry">再取得中</span>' : row.ok ? '<span class="badge ok">OK</span>' : '<span class="badge ng">NG</span>';
       const depList = (key, list) => list.length
@@ -681,6 +692,7 @@
         <td class="name">${treePrefix}${esc(row.name)}${dupMark}</td>
         <td class="mono">${esc(row.version)}</td>
         <td>${esc(depTypeLabel)}</td>
+        <td class="${row.source === 'package-lock.json' ? 'note' : ''}">${esc(row.source || 'package.json')}</td>
         <td class="mono">${row.depth ?? 0}</td>
         <td>${parentsCell}</td>
         <td>${esc(row.license)}</td>

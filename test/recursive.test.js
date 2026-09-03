@@ -125,7 +125,7 @@ test('discoverDependencies: lock があれば lock の位置で解決し、同�
   assert.equal(a.depth, 0);
   assert.equal(progress.at(-1).processed, 4);
   const s = summarizeNodes(nodes);
-  assert.deepEqual(s, { total: 4, direct: 1, transitive: 3, failed: 0, maxDepth: 2, unresolved: 0, fromLock: 4 });
+  assert.deepEqual(s, { total: 4, direct: 1, transitive: 3, failed: 0, maxDepth: 2, unresolved: 0, fromLock: 4, lockOnly: 0 });
 });
 
 test('discoverDependencies: lock に無い子は範囲を満たす最大バージョンで解決し、備考に残す', async () => {

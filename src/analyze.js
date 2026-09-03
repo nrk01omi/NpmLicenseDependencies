@@ -1,6 +1,12 @@
 import semver from 'semver';
 
-import { loadProject, listDirectDependencies, readInstalledVersion } from './project.js';
+import {
+  loadProject,
+  listDirectDependencies,
+  listLockPackages,
+  listLockRootDependencies,
+  readInstalledVersion,
+} from './project.js';
 import { RegistryClient, RegistryNotFoundError } from './registry.js';
 import { NpmSiteClient, siteUrl } from './npmsite.js';
 import { VulnClient, attachVulnerabilities, formatVulnSummary, formatVulnDetails } from './vulns.js';
@@ -11,6 +17,7 @@ export const CSV_HEADER = [
   'ライブラリ名',
   'バージョン',
   '依存種別',
+  '取得元',
   '深さ',
   '要求元',
   'ライセンス',
@@ -35,6 +42,27 @@ export const MATCH = {
 export const DEP_TYPE_TRANSITIVE = 'transitive';
 
 /**
+ * 行のリストの作り方。
+ *   union       — package.json 由来 ∪ package-lock.json 由来（OR で網羅。既定）
+ *   packageJson — package.json 由来のみ（この機能を入れる前と同じ動き）
+ */
+export const LIST_MODES = ['union', 'packageJson'];
+
+export function normalizeListMode(mode) {
+  return LIST_MODES.includes(mode) ? mode : 'union';
+}
+
+/**
+ * 取得元（その行がどちらのリストから来たか）。
+ * 行のリストは package.json 由来と package-lock.json 由来の OR（和集合）で作る。
+ */
+export const SOURCE = {
+  BOTH: '両方',
+  PACKAGE_JSON: 'package.json',
+  LOCK: 'package-lock.json',
+};
+
+/**
  * プロジェクト全体を解析する。CLI と Web UI の両方から使う。
  *
  * @param {object} options
@@ -50,6 +78,8 @@ export const DEP_TYPE_TRANSITIVE = 'transitive';
  * @param {{ min: number, max: number }} [options.siteWaitMs]  サイト取得ごとに入れる待ち時間の範囲（ミリ秒、ランダム）
  * @param {'cdp'|'playwright'} [options.siteEngine]  サイト取得のブラウザ操作方法（既定 cdp。playwright は playwright-core のインストールが必要）
  * @param {boolean} [options.recursive]  依存ライブラリを再帰的にたどり、推移的依存もすべて行にする（既定 false）
+ * @param {'union'|'packageJson'} [options.listMode]  行のリストの作り方（既定 union = package.json ∪ package-lock.json）
+ * @param {boolean} [options.includeLock]  listMode の代わりに真偽値で指定する場合（後方互換。false なら packageJson と同じ）
  * @param {(ev: { processed: number, total: number }) => void} [options.onDiscoverProgress]  再帰調査の進捗
  * @param {(ev: { nodes: object[], summary: object }) => Promise<boolean>|boolean} [options.onDiscovered]
  *   再帰調査が終わったときに呼ばれる。false を返すと本調査に入らず終了する（rows は空、aborted: true）。省略時は続行
@@ -75,6 +105,8 @@ export async function analyze(options) {
     siteWaitMs,
     siteEngine = 'cdp',
     recursive = false,
+    listMode = 'union',
+    includeLock = normalizeListMode(listMode) === 'union',
     useVulns = true,
     onDiscoverProgress,
     onDiscovered,
@@ -86,7 +118,11 @@ export async function analyze(options) {
     onVulns,
   } = options;
   const project = await loadProject(projectDir);
-  const deps = listDirectDependencies(project.packageJson, { includeDev });
+  // 直接依存は package.json と package-lock.json のルート記録の OR（lock だけが知っている直接依存も拾う）
+  const deps = mergeDirectDependencies(
+    listDirectDependencies(project.packageJson, { includeDev }),
+    includeLock ? listLockRootDependencies(project.lock, { includeDev }) : [],
+  );
   onStart?.({ project, deps });
 
   const client = new RegistryClient({ registryUrl, cacheDir });
@@ -96,12 +132,19 @@ export async function analyze(options) {
   let summary = null;
   if (recursive) {
     nodes = await discoverDependencies(project, deps, client, { versionMode, onProgress: onDiscoverProgress });
+    // package.json からたどれなかった lock 上のライブラリを足す（OR）。再帰調査の件数確認にも含める
+    if (includeLock) nodes = mergeLockPackages(nodes, project, { includeDev, matchByName: false });
     summary = summarizeNodes(nodes);
     const proceed = onDiscovered ? await onDiscovered({ nodes, summary }) : true;
     if (!proceed) {
       return { project, deps, rows: [], nodes, summary, aborted: true, stats: { ...client.stats, site: null } };
     }
     targets = nodes;
+  } else if (includeLock) {
+    // 非再帰でも、lock に載っているライブラリはすべて行にする（直接依存 OR lock）
+    targets = mergeLockPackages(deps, project, { includeDev, matchByName: true });
+  } else {
+    targets = markSources(deps, project, { includeDev });
   }
   onTargets?.({ targets });
 
@@ -170,6 +213,7 @@ export async function buildRow(dep, project, client, rowOptions = {}) {
   const base = {
     name: dep.name,
     depType: dep.depType,
+    source: dep.source ?? SOURCE.PACKAGE_JSON,
     depth: dep.depth ?? 0,
     parents: dep.parents ?? [],
   };
@@ -295,6 +339,7 @@ export function rowToCells(row) {
     row.name,
     row.version,
     row.depType,
+    row.source ?? SOURCE.PACKAGE_JSON,
     String(row.depth ?? 0),
     (row.parents ?? []).join('; '),
     row.license,
@@ -356,6 +401,7 @@ function cellsToRow(cells, get) {
     name,
     version,
     depType: get(cells, '依存種別') || 'dependencies',
+    source: get(cells, '取得元') || SOURCE.PACKAGE_JSON,
     depth: Number.parseInt(get(cells, '深さ'), 10) || 0,
     parents: list(get(cells, '要求元')),
     license,
@@ -535,7 +581,101 @@ export function summarizeNodes(nodes) {
   const maxDepth = nodes.reduce((m, n) => Math.max(m, n.depth), 0);
   const unresolved = nodes.reduce((m, n) => m + (n.unresolved?.length ?? 0), 0);
   const fromLock = nodes.filter((n) => n.lockPath).length;
-  return { total: nodes.length, direct, transitive: nodes.length - direct, failed, maxDepth, unresolved, fromLock };
+  const lockOnly = nodes.filter((n) => n.source === SOURCE.LOCK).length;
+  return { total: nodes.length, direct, transitive: nodes.length - direct, failed, maxDepth, unresolved, fromLock, lockOnly };
+}
+
+// ---------------------------------------------------------------- リストの OR（package.json ∪ package-lock.json）
+
+/**
+ * package.json の直接依存と、package-lock.json のルートに記録された直接依存をマージする（OR）。
+ * 同じ名前は 1 件にまとめ、取得元を「両方」にする。
+ */
+export function mergeDirectDependencies(fromPackageJson, fromLockRoot = []) {
+  const out = [];
+  const index = new Map();
+  for (const d of fromPackageJson) {
+    const dep = { ...d, source: SOURCE.PACKAGE_JSON };
+    index.set(d.name, dep);
+    out.push(dep);
+  }
+  for (const d of fromLockRoot) {
+    const existing = index.get(d.name);
+    if (existing) {
+      existing.source = SOURCE.BOTH;
+      continue;
+    }
+    const dep = { ...d, source: SOURCE.LOCK, note: 'package.json に無く package-lock.json のルートにのみある直接依存' };
+    index.set(d.name, dep);
+    out.push(dep);
+  }
+  return out;
+}
+
+/** package-lock.json 上の name@version と name の集合を作る（取得元の判定用。dev も含めて見る）。 */
+function lockMembership(project) {
+  const keys = new Set();
+  const names = new Set();
+  for (const p of listLockPackages(project.lock, { includeDev: true })) {
+    keys.add(`${p.name}@${p.version}`);
+    names.add(p.name);
+  }
+  return { keys, names };
+}
+
+/**
+ * 既存のターゲット（package.json 由来）に取得元を付ける。lock にも同じものがあれば「両方」。
+ * 配列はそのまま（各要素に source を書き込む）返す。
+ */
+export function markSources(targets, project) {
+  const { keys, names } = lockMembership(project);
+  for (const t of targets) {
+    if (t.source === SOURCE.LOCK) continue;
+    const inLock = t.version ? keys.has(`${t.name}@${t.version}`) : names.has(t.name);
+    t.source = inLock ? SOURCE.BOTH : SOURCE.PACKAGE_JSON;
+  }
+  return targets;
+}
+
+/**
+ * package.json 由来のターゲットに、package-lock.json にしか無いライブラリを足す（OR で網羅する）。
+ * 既存要素には取得元を書き込み、追加分は取得元 'package-lock.json' の新しいターゲットにする。
+ *
+ * @param {object[]} targets  package.json 由来のターゲット（直接依存 or 再帰調査のノード）
+ * @param {object} project  loadProject の戻り値
+ * @param {{ includeDev?: boolean, matchByName?: boolean }} [options]
+ *   matchByName=true のときは名前だけで既出判定する（バージョン未解決の直接依存リストに足す場合）
+ */
+export function mergeLockPackages(targets, project, options = {}) {
+  const { includeDev = false, matchByName = false } = options;
+  const list = markSources(targets, project);
+  const lockPkgs = listLockPackages(project.lock, { includeDev });
+  if (lockPkgs.length === 0) return list;
+
+  const seenKeys = new Set();
+  const seenNames = new Set();
+  for (const t of list) {
+    if (t.version) seenKeys.add(`${t.name}@${t.version}`);
+    seenNames.add(t.name);
+  }
+  for (const p of lockPkgs) {
+    const key = `${p.name}@${p.version}`;
+    if (seenKeys.has(key) || (matchByName && seenNames.has(p.name))) continue;
+    seenKeys.add(key);
+    seenNames.add(p.name);
+    list.push({
+      name: p.name,
+      version: p.version,
+      range: '',
+      depType: DEP_TYPE_TRANSITIVE,
+      source: SOURCE.LOCK,
+      depth: p.lockPath.length - 1,
+      parents: [],
+      lockPath: p.lockPath,
+      note: `package-lock.json のみ（node_modules/${p.lockPath.join('/node_modules/')}）`,
+    });
+  }
+  return list;
 }
 
 /** 子依存 (name, range) のバージョンを、親の lock 上の位置を起点に決める。決められなければ null。 */

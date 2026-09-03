@@ -43,6 +43,7 @@
     <a href="#overview">概要</a>
     <a href="#features">機能番号 ①〜⑥</a>
     <a href="#columns">列の意味と取得方法</a>
+    <a href="#list">リストの作り方</a>
     <a href="#version">参照バージョン</a>
     <a href="#site">npm サイト照合</a>
     <a href="#recursive">再帰調査</a>
@@ -74,7 +75,7 @@
   <p>画面の設定と結果表の列見出しには同じ番号が付いています。<b>①だけで基本の CSV が出ます</b>（②③は①に含まれます）。④⑤⑥は任意で、必要なときだけ有効にしてください。</p>
   <table>
     <tr><th>番号</th><th>機能</th><th>結果表の列</th><th>設定</th><th>詳細</th></tr>
-    <tr id="f1"><td><b>①</b></td><td>基本取得</td><td>ライブラリ名・バージョン・種別・ライセンス・リポジトリ</td><td>プロジェクトフォルダ、出力 CSV、devDependencies、レジストリ URL／キャッシュ、参照バージョン、エラー時の動作</td><td><a href="#columns">列の意味</a>、<a href="#version">参照バージョン</a>、<a href="#errors">エラー時の動作</a></td></tr>
+    <tr id="f1"><td><b>①</b></td><td>基本取得</td><td>ライブラリ名・バージョン・種別・取得元・ライセンス・リポジトリ</td><td>プロジェクトフォルダ、出力 CSV、devDependencies、リストの作り方、レジストリ URL／キャッシュ、参照バージョン、エラー時の動作</td><td><a href="#columns">列の意味</a>、<a href="#list">リストの作り方</a>、<a href="#version">参照バージョン</a>、<a href="#errors">エラー時の動作</a></td></tr>
     <tr id="f2"><td><b>②</b></td><td>依存ライブラリ</td><td>依存ライブラリ（package.json から求まる dependencies）</td><td>なし（①の参照バージョンに従う）</td><td><a href="#columns">列の意味</a></td></tr>
     <tr id="f3"><td><b>③</b></td><td>取得済みライブラリ</td><td>取得済みライブラリ（package-lock.json で取得したバージョン）</td><td>なし（対象プロジェクトの package-lock.json を読む）</td><td><a href="#columns">列の意味</a></td></tr>
     <tr id="f4"><td><b>④</b></td><td>npm サイト照合</td><td>npm サイトの dependencies、一致状態</td><td>取得する／しない、サイト応答のキャッシュ、待ち時間、取得方法（内蔵／Playwright）、ブラウザ</td><td><a href="#site">npm サイト照合</a></td></tr>
@@ -89,7 +90,8 @@
     <tr><th>列</th><th>取得元と方法</th></tr>
     <tr><td>ライブラリ名</td><td><code>package.json</code> の <code>dependencies</code>（設定により <code>devDependencies</code> も）のキー。</td></tr>
     <tr><td>バージョン</td><td>レジストリに問い合わせた<b>正確なバージョン</b>。決め方は <a href="#version">参照バージョン</a> を参照。</td></tr>
-    <tr><td>依存種別</td><td><code>dependencies</code> / <code>devDependencies</code> のどちらに書かれていたか。再帰調査で見つかった推移的依存は <code>transitive</code>（画面では「推移的」）。</td></tr>
+    <tr><td>依存種別</td><td><code>dependencies</code> / <code>devDependencies</code> のどちらに書かれていたか。再帰調査で見つかった推移的依存や、<code>package-lock.json</code> にしか無いものは <code>transitive</code>（画面では「推移的」）。</td></tr>
+    <tr><td>取得元</td><td>その行がどちらのリストから来たか。<code>両方</code>（package.json からたどれて lock にもある） / <code>package.json</code>（lock に無い） / <code>package-lock.json</code>（package.json からはたどれない）。詳しくは <a href="#list">リストの作り方</a>。</td></tr>
     <tr><td>深さ</td><td>直接依存は 0。推移的依存は、直接依存から何段たどったか（複数経路があれば最短）。</td></tr>
     <tr><td>要求元</td><td>このライブラリを依存として要求しているライブラリ（<code>名前@バージョン</code>、複数なら <code>; </code> 区切り）。再帰調査のときのみ。</td></tr>
     <tr><td>ライセンス</td><td>レジストリから返った JSON の <code>license</code>。文字列ならそのまま、<code>{ type: "MIT" }</code> 形式なら type、旧形式 <code>licenses: [...]</code> は type を <code>OR</code> で連結。無ければ <code>UNKNOWN</code>、取得できなければ <code>取得失敗</code>。</td></tr>
@@ -135,6 +137,29 @@
     <tr><td>形</td><td><code>名前@^1.2.3</code>（範囲）</td><td><code>名前@1.2.3</code>（固定）</td><td><code>名前</code> のみ</td></tr>
     <tr><td>向いている用途</td><td>ライブラリの要求内容の確認</td><td>CycloneDX（<code>pkg:npm/名前@1.2.3</code>）との突き合わせ、配布物の監査</td><td>レジストリ API とサイト表示の突き合わせ（検証用）</td></tr>
   </table>
+</section>
+
+<section id="list">
+  <h2>リストの作り方 — package.json ∪ package-lock.json</h2>
+  <p>行のリストの作り方は設定「リストの作り方」（CLI <code>--list</code>）で選べます。</p>
+  <table>
+    <tr><th>選択</th><th>動き</th></tr>
+    <tr><td><b>package.json ∪ package-lock.json（OR で網羅）</b><br><span class="muted">既定 / <code>--list union</code></span></td><td>下の表の両方を拾う<b>和集合</b>。実際にインストールされているライブラリを取りこぼしません。</td></tr>
+    <tr><td>package.json のみ（従来どおり）<br><span class="muted"><code>--list package-json</code>（<code>--no-lock</code> も同じ）</span></td><td>この機能を入れる前と同じ動き。直接依存（＋再帰調査でたどれた推移的依存）だけを行にします。</td></tr>
+  </table>
+  <p>OR のときに拾うものは次のとおりです。</p>
+  <table>
+    <tr><th>由来</th><th>拾うもの</th></tr>
+    <tr><td><code>package.json</code></td><td><code>dependencies</code>（設定により <code>devDependencies</code> も）の直接依存と、<a href="#recursive">再帰調査</a>でたどれた推移的依存。</td></tr>
+    <tr><td><code>package-lock.json</code></td><td>ルート（<code>packages[""]</code>）に記録された直接依存（<code>optionalDependencies</code> を含む）と、lock に実体があるすべてのパッケージ（ネストされた <code>node_modules/…/node_modules/…</code> も別バージョンとして 1 行）。</td></tr>
+  </table>
+  <p>再帰調査がたどるのは <code>dependencies</code> だけなので、<code>peerDependencies</code> / <code>optionalDependencies</code> 由来のものや、範囲を解決できなかったものは package.json 側からは拾えません。lock 側からも列挙して OR にすることで、実際にインストールされているライブラリを取りこぼさないようにしています。</p>
+  <ul>
+    <li>重複は <code>名前@バージョン</code>（再帰調査なしのときは名前）で 1 行にまとめ、両方にあれば「取得元」は <code>両方</code></li>
+    <li>lock にしかない行は、深さ＝lock 上のネストの深さ、要求元は空（依存グラフ上の親が分からないため）、備考に lock 上の位置を記載</li>
+    <li>devDependencies を含めない設定では、lock 側の <code>dev</code> / <code>devOptional</code> 扱いのパッケージも加えません</li>
+    <li>再帰調査なしでも lock 上のパッケージはすべて行になるため、行数は lock の規模（数十〜数百件）になります。件数を抑えたいときは「package.json のみ」を選んでください</li>
+  </ul>
 </section>
 
 <section id="version">
@@ -238,6 +263,7 @@
     <li>devDependencies を含める／含めないの切り替え</li>
     <li>参照バージョンを「インストール済み」「npm の最新版」から選択</li>
     <li>再帰調査: 依存ライブラリをたどって推移的依存もすべて 1 行ずつ出力（件数を確認してから本調査。深さ・要求元付き）</li>
+    <li>リストは package.json と package-lock.json の OR（<a href="#list">リストの作り方</a>）。lock にしか無いライブラリも「取得元」付きで 1 行ずつ出力</li>
     <li>npm サイト（npmjs.com）の Dependencies 欄を取得して、依存ライブラリ／取得済みライブラリとの件数一致を「全一致／不一致」で表示（取得しない設定も可、待ち時間は可変）</li>
     <li>スコープ付きパッケージ（<code>@scope/name</code>）の取得</li>
     <li>lockfileVersion 1 / 2 / 3 の package-lock.json の読み取り</li>
@@ -254,7 +280,7 @@
 <section id="cannot">
   <h2>できないこと・限界</h2>
   <ul class="cannot">
-    <li><b>再帰調査での devDependencies / peerDependencies / optionalDependencies の追跡</b> — たどるのは <code>dependencies</code> のみです</li>
+    <li><b>再帰調査での devDependencies / peerDependencies / optionalDependencies の追跡</b> — たどるのは <code>dependencies</code> のみです（ただし lock に載っていれば <a href="#list">lock 側のリスト</a>で拾えます。この場合は要求元が空になります）</li>
     <li><b>peerDependencies / optionalDependencies</b> — 「依存ライブラリ」には含めません（<code>dependencies</code> のみ）</li>
     <li><b>レジストリ以外の依存指定</b> — <code>git+https://…</code>、<code>file:…</code>、<code>github:user/repo</code> などは、lock / node_modules にバージョンが無い場合「取得失敗」になります（行は残ります）</li>
     <li><b>npm サイトの Dependencies 欄以外の取得</b> — サイトからは Dependencies 欄の名前だけを取り出します。Dev Dependencies、週間ダウンロード数などは取得しません。また Edge / Chrome が無い環境ではサイト照合はできません（レジストリ側の取得は動きます）</li>
@@ -307,15 +333,15 @@
   <h2>CSV 形式</h2>
   <ul>
     <li>文字コード UTF-8（BOM 付き）、改行 CRLF、RFC 4180 のクォート。Excel でダブルクリックしても日本語ヘッダーが文字化けしません</li>
-    <li>列順: <code>ライブラリ名, バージョン, 依存種別, 深さ, 要求元, ライセンス, 依存ライブラリ, 取得済みライブラリ, npm サイトの dependencies, 一致状態, 脆弱性, 脆弱性の詳細, リポジトリ, 備考</code>
-      （機能番号: ①①①⑤⑤①②③④④⑥⑥①－。CSV のヘッダーには番号を付けていません）</li>
+    <li>列順: <code>ライブラリ名, バージョン, 依存種別, 取得元, 深さ, 要求元, ライセンス, 依存ライブラリ, 取得済みライブラリ, npm サイトの dependencies, 一致状態, 脆弱性, 脆弱性の詳細, リポジトリ, 備考</code>
+      （機能番号: ①①①①⑤⑤①②③④④⑥⑥①－。CSV のヘッダーには番号を付けていません）</li>
     <li>「脆弱性の詳細」は 1 セル内に <code>GHSA-ID [深刻度 CVSS] タイトル (影響: 範囲) URL</code> を <code>; </code> 区切り。⑥を使わない設定では「脆弱性」「脆弱性の詳細」は空</li>
     <li>「依存ライブラリ」「取得済みライブラリ」「npm サイトの dependencies」は 1 セル内に <code>; </code>（セミコロン＋空白）区切り</li>
     <li>「一致状態」は <code>全一致</code> / <code>不一致</code> / <code>サイト未取得</code>。npm サイトを取得しない設定では空</li>
     <li>取得失敗の行も残ります（ライセンス欄 <code>取得失敗</code>、備考に理由）</li>
   </ul>
-  <pre><code>ライブラリ名,バージョン,依存種別,深さ,要求元,ライセンス,依存ライブラリ,取得済みライブラリ,npm サイトの dependencies,一致状態,脆弱性,脆弱性の詳細,リポジトリ,備考
-axios,1.14.0,dependencies,0,,MIT,follow-redirects@^1.15.11; form-data@^4.0.5; proxy-from-env@^2.1.0,follow-redirects@1.15.11; form-data@4.0.5; proxy-from-env@2.1.0,follow-redirects; form-data; proxy-from-env,全一致,"あり 1 件 (最高 high; high 1)","GHSA-q8qp-cvcw-x6jj [high 7.4] Axios has prototype pollution … (影響: >=1.0.0 <1.15.2) https://github.com/advisories/GHSA-q8qp-cvcw-x6jj",git+https://github.com/axios/axios.git,</code></pre>
+  <pre><code>ライブラリ名,バージョン,依存種別,取得元,深さ,要求元,ライセンス,依存ライブラリ,取得済みライブラリ,npm サイトの dependencies,一致状態,脆弱性,脆弱性の詳細,リポジトリ,備考
+axios,1.14.0,dependencies,両方,0,,MIT,follow-redirects@^1.15.11; form-data@^4.0.5; proxy-from-env@^2.1.0,follow-redirects@1.15.11; form-data@4.0.5; proxy-from-env@2.1.0,follow-redirects; form-data; proxy-from-env,全一致,"あり 1 件 (最高 high; high 1)","GHSA-q8qp-cvcw-x6jj [high 7.4] Axios has prototype pollution … (影響: >=1.0.0 <1.15.2) https://github.com/advisories/GHSA-q8qp-cvcw-x6jj",git+https://github.com/axios/axios.git,</code></pre>
 </section>
 
 </main>

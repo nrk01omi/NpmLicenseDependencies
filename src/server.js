@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
-import { analyze, buildRow, rowToCells, rowsFromCsv, orderRows, normalizeOrder, CSV_HEADER, MATCH, DEP_TYPE_TRANSITIVE } from './analyze.js';
+import { analyze, buildRow, rowToCells, rowsFromCsv, orderRows, normalizeOrder, CSV_HEADER, MATCH, DEP_TYPE_TRANSITIVE, SOURCE, normalizeListMode } from './analyze.js';
 import { RegistryClient } from './registry.js';
 import { NpmSiteClient, DEFAULT_WAIT_MS, normalizeEngine } from './npmsite.js';
 import { VulnClient, attachVulnerabilities } from './vulns.js';
@@ -42,6 +42,7 @@ const state = {
   browser: '', // サイト取得に使うブラウザの実行ファイル（空なら自動検出）
   siteEngine: 'cdp', // cdp（内蔵）| playwright（要 playwright-core）
   recursive: false, // 依存ライブラリを再帰的にたどる
+  listMode: 'union', // 行のリストの作り方: union（package.json ∪ package-lock.json）| packageJson（従来どおり）
   order: 'tree', // CSV の並び順: tree（親子順）| depth（深さ順）
   useVulns: true, // ⑥ 脆弱性チェック（npm advisories API）
   vulnStats: null, // ⑥ の集計 { checked, withVulns, advisories, error }
@@ -117,6 +118,7 @@ async function startJob(params) {
     browser: String(params.browser ?? '').trim(),
     siteEngine: normalizeEngine(params.siteEngine),
     recursive: Boolean(params.recursive),
+    listMode: normalizeListMode(params.listMode ?? (params.includeLock === false ? 'packageJson' : 'union')),
     order: normalizeOrder(params.order),
     useVulns: params.useVulns !== false,
     vulnStats: null,
@@ -133,6 +135,11 @@ async function startJob(params) {
   context = { projectInfo: null, deps: [], pendingResolve: null, recursiveResolve: null, askChain: Promise.resolve() };
   log(`解析開始: ${state.project}`);
   log(state.recursive ? '⑤ 再帰調査: あり（依存ライブラリをたどって推移的依存を列挙し、件数を確認してから本調査）' : '⑤ 再帰調査: なし（直接依存のみ）');
+  log(
+    state.listMode === 'union'
+      ? 'リストの作り方: package.json ∪ package-lock.json（OR。lock にしか無いライブラリも行にします）'
+      : 'リストの作り方: package.json のみ（従来どおり。lock にしか無いライブラリは行にしません）',
+  );
   log(state.useVulns ? '⑥ 脆弱性チェック: あり（npm advisories API、本調査の後にまとめて確認）' : '⑥ 脆弱性チェック: なし');
   log(`参照バージョン: ${state.versionMode === 'latest' ? 'npm の最新版 (npm サイトの表示と同じ)' : 'インストール済み (package-lock / node_modules)'}`);
   log(`エラー時の動作: ${{ ask: '確認ダイアログを表示', auto: `自動リトライ (最大 ${state.autoRetries} 回)`, ignore: '失敗のまま次へ' }[state.errorPolicy]}`);
@@ -159,6 +166,7 @@ async function startJob(params) {
         siteWaitMs: siteWaitMs(),
         siteEngine: state.siteEngine,
         recursive: state.recursive,
+        listMode: state.listMode,
         useVulns: state.useVulns,
         onVulns: (v) => {
           state.vulnStats = v;
@@ -185,7 +193,7 @@ async function startJob(params) {
           state.phase = 'confirm';
           state.pendingRecursive = summary;
           log(
-            `再帰調査 完了: 合計 ${summary.total} 件 (直接 ${summary.direct} 件, 推移的 ${summary.transitive} 件, 最大深さ ${summary.maxDepth}, lock で決定 ${summary.fromLock} 件, 解決不能 ${summary.unresolved} 件, 取得失敗 ${summary.failed} 件)`,
+            `再帰調査 完了: 合計 ${summary.total} 件 (直接 ${summary.direct} 件, 推移的 ${summary.transitive} 件, lock のみ ${summary.lockOnly ?? 0} 件, 最大深さ ${summary.maxDepth}, lock で決定 ${summary.fromLock} 件, 解決不能 ${summary.unresolved} 件, 取得失敗 ${summary.failed} 件)`,
           );
           log('件数を確認して「本調査を開始」を押してください（確認待ち）');
           broadcast();
@@ -203,7 +211,8 @@ async function startJob(params) {
           context.deps = targets;
           state.total = targets.length;
           state.rows = new Array(targets.length).fill(null);
-          log(`本調査: ${targets.length} 件を処理します`);
+          const lockOnly = targets.filter((t) => t.source === SOURCE.LOCK).length;
+          log(`本調査: ${targets.length} 件を処理します${lockOnly > 0 ? `（うち package-lock.json のみ ${lockOnly} 件）` : ''}`);
           broadcast();
         },
         onProgress: ({ index, row, completed, total }) => {
@@ -444,6 +453,7 @@ async function loadCsvFile(filePath) {
     stats: null,
     retrying: [],
     recursive: parsed.rows.some((r) => r.depth > 0),
+    listMode: parsed.rows.some((r) => r.source === SOURCE.LOCK) ? 'union' : 'packageJson',
     useSite: parsed.rows.some((r) => r.siteStatus !== 'skipped'),
     useVulns: parsed.rows.some((r) => r.vulnStatus !== 'skipped'),
     discovery: null,

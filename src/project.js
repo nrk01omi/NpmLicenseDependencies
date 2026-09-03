@@ -150,3 +150,69 @@ async function readJson(filePath) {
     throw new Error(`${filePath} の読み込みに失敗しました: ${err.message}`);
   }
 }
+
+/**
+ * package-lock.json に載っているパッケージをすべて列挙する（node_modules 配下の実体エントリ）。
+ * lockfileVersion 2/3 は packages の "node_modules/…" キー、v1 は dependencies の入れ子をたどる。
+ * ネストされた同名別バージョンもそれぞれ 1 件として返す。
+ *
+ * @param {object|null} lock
+ * @param {{ includeDev?: boolean }} [options]  includeDev=false のとき dev / devOptional のみのものは除く
+ * @returns {Array<{ name: string, version: string, lockPath: string[], dev: boolean, optional: boolean }>}
+ */
+export function listLockPackages(lock, options = {}) {
+  const { includeDev = false } = options;
+  const out = [];
+  if (!lock || typeof lock !== 'object') return out;
+
+  if (lock.packages && typeof lock.packages === 'object') {
+    for (const [key, entry] of Object.entries(lock.packages)) {
+      if (!key.startsWith('node_modules/')) continue;
+      if (!entry || typeof entry.version !== 'string' || entry.link) continue;
+      const dev = Boolean(entry.dev || entry.devOptional);
+      if (dev && !includeDev) continue;
+      const lockPath = key.slice('node_modules/'.length).split('/node_modules/');
+      out.push({ name: lockPath[lockPath.length - 1], version: entry.version, lockPath, dev, optional: Boolean(entry.optional) });
+    }
+    return out;
+  }
+
+  if (lock.dependencies && typeof lock.dependencies === 'object') {
+    const walk = (deps, parentPath) => {
+      for (const [name, entry] of Object.entries(deps ?? {})) {
+        if (!entry || typeof entry.version !== 'string') continue;
+        const lockPath = [...parentPath, name];
+        const dev = Boolean(entry.dev);
+        if (!dev || includeDev) out.push({ name, version: entry.version, lockPath, dev, optional: Boolean(entry.optional) });
+        if (entry.dependencies) walk(entry.dependencies, lockPath);
+      }
+    };
+    walk(lock.dependencies, []);
+  }
+  return out;
+}
+
+/**
+ * package-lock.json のルート（packages[""]）に記録された直接依存を返す。
+ * package.json と食い違っている（lock だけが知っている）直接依存を拾うために使う。
+ * v1 形式にはルートの依存記録が無いので空配列。
+ *
+ * @returns {Array<{ name: string, range: string, depType: string }>}
+ */
+export function listLockRootDependencies(lock, options = {}) {
+  const { includeDev = false } = options;
+  const root = lock && lock.packages && typeof lock.packages === 'object' ? lock.packages[''] : null;
+  if (!root || typeof root !== 'object') return [];
+  const sections = includeDev
+    ? ['dependencies', 'optionalDependencies', 'devDependencies']
+    : ['dependencies', 'optionalDependencies'];
+  const out = [];
+  for (const depType of sections) {
+    const deps = root[depType];
+    if (!deps || typeof deps !== 'object') continue;
+    for (const [name, range] of Object.entries(deps)) {
+      out.push({ name, range: String(range), depType: depType === 'optionalDependencies' ? 'dependencies' : depType });
+    }
+  }
+  return out;
+}

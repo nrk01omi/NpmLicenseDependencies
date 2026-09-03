@@ -39,6 +39,7 @@ test('buildRow: lock のバージョンでレジストリを引き、ライセ�
   assert.deepEqual(row, {
     name: 'express',
     depType: 'dependencies',
+    source: 'package.json',
     depth: 0,
     parents: [],
     ok: true,
@@ -63,6 +64,7 @@ test('buildRow: lock のバージョンでレジストリを引き、ライセ�
     'express',
     '4.21.2',
     'dependencies',
+    'package.json',
     '0',
     '',
     'MIT',
@@ -111,8 +113,8 @@ test('buildRow: npm サイトの件数が依存ライブラリ・取得済みラ
   assert.deepEqual(row.counts, { dependencies: 2, resolved: 2, site: 2 });
   assert.equal(row.match, MATCH.ALL);
   assert.equal(row.note, '');
-  assert.equal(rowToCells(row)[8], 'body-parser; cookie');
-  assert.equal(rowToCells(row)[9], '全一致');
+  assert.equal(rowToCells(row)[9], 'body-parser; cookie');
+  assert.equal(rowToCells(row)[10], '全一致');
 });
 
 test('buildRow: 取得済みライブラリが欠けていれば 不一致、サイトだけにある名前は備考に出す', async () => {
