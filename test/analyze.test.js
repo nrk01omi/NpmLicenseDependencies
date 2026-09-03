@@ -67,6 +67,9 @@ test('buildRow: lock のバージョンでレジストリを引き、ライセ�
     'package.json',
     '0',
     '',
+    '',
+    '',
+    '',
     'MIT',
     'body-parser@1.20.3; cookie@0.7.1; debug@2.6.9',
     'body-parser@1.20.3; cookie@0.7.1',
@@ -113,8 +116,8 @@ test('buildRow: npm サイトの件数が依存ライブラリ・取得済みラ
   assert.deepEqual(row.counts, { dependencies: 2, resolved: 2, site: 2 });
   assert.equal(row.match, MATCH.ALL);
   assert.equal(row.note, '');
-  assert.equal(rowToCells(row)[9], 'body-parser; cookie');
-  assert.equal(rowToCells(row)[10], '全一致');
+  assert.equal(rowToCells(row)[12], 'body-parser; cookie');
+  assert.equal(rowToCells(row)[13], '全一致');
 });
 
 test('buildRow: 取得済みライブラリが欠けていれば 不一致、サイトだけにある名前は備考に出す', async () => {

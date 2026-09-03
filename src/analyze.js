@@ -20,6 +20,9 @@ export const CSV_HEADER = [
   '取得元',
   '深さ',
   '要求元',
+  '既出',
+  '表示階層',
+  '表示上の親',
   'ライセンス',
   '依存ライブラリ',
   '取得済みライブラリ',
@@ -342,6 +345,9 @@ export function rowToCells(row) {
     row.source ?? SOURCE.PACKAGE_JSON,
     String(row.depth ?? 0),
     (row.parents ?? []).join('; '),
+    row.dup ? '既出' : '',
+    row.level != null ? String(row.level) : '',
+    row.treeParent ?? '',
     row.license,
     row.dependencies.join('; '),
     row.dependenciesResolved.join('; '),
@@ -367,7 +373,8 @@ export function vulnCell(row) {
  * 保存した CSV（toCsv(CSV_HEADER, rows.map(rowToCells)) の出力）を結果行に戻す。
  * 列は見出し名で対応付けるので、列が少ない古い形式の CSV でもある列だけで復元できる。
  * @param {string} text  CSV 全文（BOM 可）
- * @returns {{ rows: object[], header: string[], missing: string[] }}  missing は無かった列名
+ * @returns {{ rows: object[], header: string[], missing: string[], skippedDuplicates: number }}
+ *   missing は無かった列名、skippedDuplicates は落とした「既出」行の数
  */
 export function rowsFromCsv(text) {
   const table = parseCsv(text);
@@ -376,9 +383,12 @@ export function rowsFromCsv(text) {
   if (!header.includes('ライブラリ名')) throw new Error('このツールが保存した CSV ではありません（「ライブラリ名」列がありません）');
   const idx = new Map(header.map((h, i) => [h, i]));
   const get = (cells, name) => (idx.has(name) ? (cells[idx.get(name)] ?? '') : '');
-  const rows = table.slice(1).map((cells) => cellsToRow(cells, get));
+  // 「既出」行は画面表示のための重複なので、復元時は落とす（表側で親子順に展開し直すため）
+  const body = table.slice(1).filter((cells) => get(cells, '既出') === '');
+  const skippedDuplicates = table.length - 1 - body.length;
+  const rows = body.map((cells) => cellsToRow(cells, get));
   const missing = CSV_HEADER.filter((h) => !idx.has(h));
-  return { rows, header, missing };
+  return { rows, header, missing, skippedDuplicates };
 }
 
 function cellsToRow(cells, get) {
@@ -532,10 +542,16 @@ export function normalizeOrder(order) {
 
 /**
  * 親子順（ツリー）に並べる。直接依存（深さ 0）を元の順のまま根とし、その下に子を名前順で深さ優先にぶら下げる。
- * 複数の親から要求される行は最初に現れた位置にだけ出す（1 行 1 パッケージを保つ）。
  * 再帰調査でない結果（全行が深さ 0）では元の順のまま。null（取得中）の行は末尾に残す。
+ *
+ * @param {object[]} rows
+ * @param {{ expandDuplicates?: boolean }} [options]
+ *   false（既定）: 複数の親から要求される行は最初に現れた位置にだけ出す（1 行 1 パッケージ）
+ *   true         : 画面と同じ展開。2 回目以降も親の下に出し、行のコピーに dup / level / treeParent を付ける
+ *                  （既出の行の下に子は展開しない）
  */
-export function orderRowsTree(rows) {
+export function orderRowsTree(rows, options = {}) {
+  const { expandDuplicates = false } = options;
   const key = (r) => `${r.name}@${r.version}`;
   const children = new Map();
   const roots = [];
@@ -554,21 +570,27 @@ export function orderRowsTree(rows) {
   for (const list of children.values()) list.sort((a, b) => a.name.localeCompare(b.name));
   const out = [];
   const seen = new Set();
-  const visit = (r) => {
+  const visit = (r, level, parent) => {
     const k = key(r);
-    if (seen.has(k)) return;
+    if (seen.has(k)) {
+      if (expandDuplicates) out.push({ ...r, dup: true, level, treeParent: parent }); // 既出: 出すが下は展開しない
+      return;
+    }
     seen.add(k);
-    out.push(r);
-    for (const c of children.get(k) ?? []) visit(c);
+    out.push(expandDuplicates ? { ...r, dup: false, level, treeParent: parent } : r);
+    for (const c of children.get(k) ?? []) visit(c, level + 1, k);
   };
-  for (const r of roots) visit(r);
-  for (const r of rows) if (r && !seen.has(key(r))) visit(r); // どの根からも届かない行（念のため）
+  for (const r of roots) visit(r, 0, '');
+  for (const r of rows) if (r && !seen.has(key(r))) visit(r, 0, ''); // どの根からも届かない行（念のため）
   return [...out, ...pending];
 }
 
-/** 指定の並び順で行を並べる。 */
-export function orderRows(rows, order) {
-  if (normalizeOrder(order) === 'tree') return orderRowsTree(rows);
+/**
+ * 指定の並び順で行を並べる。
+ * @param {{ expandDuplicates?: boolean }} [options]  親子順のとき、既出（複数の親を持つ行）も画面と同じように繰り返し出す
+ */
+export function orderRows(rows, order, options = {}) {
+  if (normalizeOrder(order) === 'tree') return orderRowsTree(rows, options);
   const list = rows.filter(Boolean);
   list.sort((a, b) => (a.depth ?? 0) - (b.depth ?? 0) || a.name.localeCompare(b.name));
   return [...list, ...rows.filter((r) => !r)];

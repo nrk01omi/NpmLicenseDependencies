@@ -276,6 +276,7 @@
         <button data-order="tree" class="active" title="直接依存の直下に子・孫をぶら下げて表示（親ごとの塊で見る）。複数の親から要求されるものは 2 回目以降を「既出」として薄く表示">親子順</button>
         <button data-order="depth" title="直接依存 → 深さ 1 → 深さ 2 … の順（同じ深さは名前順）">深さ順</button>
       </span>
+      <label class="seg-label" title="親子順のとき、画面と同じように「既出」（複数の親から要求される行の 2 回目以降）も CSV に出します。CSV 側は「既出」「表示階層」「表示上の親」列で絞り込めます。外すと 1 行 1 パッケージになります"><input type="checkbox" id="csvDuplicates" checked> CSV も画面と同じ行（既出を含む）</label>
       <input type="text" id="search" placeholder="ライブラリ名 / ライセンス / 要求元で絞り込み" style="width:280px">
       <span id="rowCount" class="saved"></span>
       <span class="spacer"></span>
@@ -362,7 +363,7 @@
     statusBadge: $('statusBadge'), progress: $('progress'), cCompleted: $('cCompleted'), cTotal: $('cTotal'),
     cOk: $('cOk'), cNg: $('cNg'), cElapsed: $('cElapsed'), cStats: $('cStats'), log: $('log'), jobError: $('jobError'),
     search: $('search'), rowCount: $('rowCount'), retryAll: $('retryAll'), save: $('save'), openFolder: $('openFolder'),
-    savedInfo: $('savedInfo'), loadCsv: $('loadCsv'), tbody: $('tbody'), empty: $('empty'), resultsError: $('resultsError'),
+    savedInfo: $('savedInfo'), csvDuplicates: $('csvDuplicates'), loadCsv: $('loadCsv'), tbody: $('tbody'), empty: $('empty'), resultsError: $('resultsError'),
     errorPolicy: $('errorPolicy'), autoRetries: $('autoRetries'), versionMode: $('versionMode'),
     recursive: $('recursive'), discoveryInfo: $('discoveryInfo'), recursiveDialog: $('recursiveDialog'), recursiveDialogError: $('recursiveDialogError'),
     useVulns: $('useVulns'), cVuln: $('cVuln'),
@@ -385,6 +386,7 @@
     if (saved.out) els.out.value = saved.out;
     if (saved.includeDev) els.includeDev.checked = true;
     if (saved.listMode) els.listMode.value = saved.listMode;
+    if (saved.csvDuplicates === false) els.csvDuplicates.checked = false;
     if (saved.useCache === false) els.useCache.checked = false;
     if (saved.registry) els.registry.value = saved.registry;
     if (saved.errorPolicy) els.errorPolicy.value = saved.errorPolicy;
@@ -402,7 +404,7 @@
   function persist() {
     try {
       localStorage.setItem('nld.settings', JSON.stringify({
-        project: els.project.value, out: els.out.value, includeDev: els.includeDev.checked, listMode: els.listMode.value,
+        project: els.project.value, out: els.out.value, includeDev: els.includeDev.checked, listMode: els.listMode.value, csvDuplicates: els.csvDuplicates.checked,
         useCache: els.useCache.checked, registry: els.registry.value,
         errorPolicy: els.errorPolicy.value, autoRetries: els.autoRetries.value, versionMode: els.versionMode.value,
         useSite: els.useSite.checked, useSiteCache: els.useSiteCache.checked, siteWaitMin: els.siteWaitMin.value, siteWaitMax: els.siteWaitMax.value, browser: els.browser.value,
@@ -452,6 +454,7 @@
       recursive: els.recursive.checked,
       useVulns: els.useVulns.checked,
       order,
+      csvDuplicates: els.csvDuplicates.checked,
     });
   });
   // 再帰調査の件数確認 → サーバーへ通知
@@ -487,7 +490,7 @@
       if (!r.path) return;
       out = r.path; els.out.value = out; persist();
     }
-    await api('/api/save', { out, order });
+    await api('/api/save', { out, order, csvDuplicates: els.csvDuplicates.checked });
   });
   els.openFolder.onclick = () => withBusy(els.openFolder, els.resultsError, () => api('/api/open'));
   // 保存した CSV を読み込んで表示（ダイアログが使えない環境ではパスを入力）
@@ -512,6 +515,7 @@
     b.onclick = () => { order = b.dataset.order; try { localStorage.setItem('nld.order', order); } catch {} syncOrderButtons(); renderTable(); };
   }
   syncOrderButtons();
+  els.csvDuplicates.onchange = persist;
   els.search.oninput = renderTable;
   // 仕様ページは常に同じ名前のウィンドウで開き、既に開いていればそれを前面に出す
   for (const a of document.querySelectorAll('a[target="nld-spec"]')) {
@@ -627,7 +631,7 @@
     els.openFolder.disabled = !state.savedAt;
     els.savedInfo.textContent = fromCsv
       ? `CSV から読み込み (保存日時 ${state.savedAt ? new Date(state.savedAt).toLocaleString('ja-JP') : '不明'}): ${state.loadedFrom} — 再取得はできません`
-      : state.savedAt ? `CSV 保存済み (${fmtTime(state.savedAt)}): ${state.out}` : (state.out ? `保存先: ${state.out}` : '');
+      : state.savedAt ? `CSV 保存済み (${fmtTime(state.savedAt)}): ${state.out} — ${state.savedRows} 行${state.savedDuplicates ? `（うち既出 ${state.savedDuplicates} 行）` : ''}` : (state.out ? `保存先: ${state.out}` : '');
     renderTable();
   }
 

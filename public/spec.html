@@ -93,7 +93,10 @@
     <tr><td>依存種別</td><td><code>dependencies</code> / <code>devDependencies</code> のどちらに書かれていたか。再帰調査で見つかった推移的依存や、<code>package-lock.json</code> にしか無いものは <code>transitive</code>（画面では「推移的」）。</td></tr>
     <tr><td>取得元</td><td>その行がどちらのリストから来たか。<code>両方</code>（package.json からたどれて lock にもある） / <code>package.json</code>（lock に無い） / <code>package-lock.json</code>（package.json からはたどれない）。詳しくは <a href="#list">リストの作り方</a>。</td></tr>
     <tr><td>深さ</td><td>直接依存は 0。推移的依存は、直接依存から何段たどったか（複数経路があれば最短）。</td></tr>
-    <tr><td>要求元</td><td>このライブラリを依存として要求しているライブラリ（<code>名前@バージョン</code>、複数なら <code>; </code> 区切り）。再帰調査のときのみ。</td></tr>
+    <tr><td>要求元</td><td>このライブラリを依存として要求しているライブラリ<b>すべて</b>（<code>名前@バージョン</code>、複数なら <code>; </code> 区切り）。再帰調査のときのみ。</td></tr>
+    <tr><td>既出<br><span class="muted">CSV のみ</span></td><td>親子順で 2 回目以降に現れた行（画面の「既出」バッジと同じ）なら <code>既出</code>、実体の行は空。設定「CSV も画面と同じ行（既出を含む）」が ON のときだけ既出行が出ます。</td></tr>
+    <tr><td>表示階層<br><span class="muted">CSV のみ</span></td><td>画面のインデント段数。同じライブラリでも、ぶら下がっている親が違えば値が変わります（「深さ」は依存グラフ上の最短の深さで、こちらは表示上の位置）。</td></tr>
+    <tr><td>表示上の親<br><span class="muted">CSV のみ</span></td><td>その行が画面でぶら下がっている親（<code>名前@バージョン</code>）。根（直接依存）は空。</td></tr>
     <tr><td>ライセンス</td><td>レジストリから返った JSON の <code>license</code>。文字列ならそのまま、<code>{ type: "MIT" }</code> 形式なら type、旧形式 <code>licenses: [...]</code> は type を <code>OR</code> で連結。無ければ <code>UNKNOWN</code>、取得できなければ <code>取得失敗</code>。</td></tr>
     <tr><td><b>依存ライブラリ</b><br><span class="muted">package.json から求まる dependencies</span></td><td>
       レジストリから返った JSON の <code>dependencies</code>（そのライブラリ<b>自身</b>の package.json に作者が書いたもの。対象プロジェクトの package.json ではありません）。<br>
@@ -234,7 +237,10 @@
     <tr><td><b>親子順</b>（tree）</td><td>
       直接依存を package.json の順に根とし、その直下に子・孫を名前順で深さ優先にぶら下げます。「ある親ライブラリが引き込む子のライセンス」を塊で確認する用途向け。<br>
       複数の親から要求されるライブラリ（同じ <code>名前@バージョン</code>）は、<b>画面では 2 回目以降も親の下に「既出」として薄く表示</b>します（塊が欠けないように。既出の下の子は展開しません）。
-      <b>CSV では最初に現れた位置に 1 行だけ</b>出します（1 行 1 パッケージを保つため。「要求元」列で他の親が分かります）。
+      <b>CSV も既定で画面と同じ行</b>を出します（設定「CSV も画面と同じ行（既出を含む）」／CLI は既定 ON、<code>--no-duplicates</code> で OFF）。
+      既出行かどうかは「既出」列、表示上の位置は「表示階層」「表示上の親」列で分かるので、Excel のフィルタで既出を外したり、特定の親の塊だけを見たりできます。
+      OFF にすると従来どおり最初に現れた位置に 1 行だけ（1 行 1 パッケージ）になります。集計は「既出」が空の行だけを対象にしてください。
+      このツールで CSV を読み込むときは、既出行は自動的に読み飛ばして表側で展開し直します。
     </td></tr>
     <tr><td>深さ順（depth）</td><td>直接依存（深さ 0）→ 深さ 1 → 深さ 2 … の順。同じ深さは名前順。</td></tr>
   </table>
@@ -333,15 +339,16 @@
   <h2>CSV 形式</h2>
   <ul>
     <li>文字コード UTF-8（BOM 付き）、改行 CRLF、RFC 4180 のクォート。Excel でダブルクリックしても日本語ヘッダーが文字化けしません</li>
-    <li>列順: <code>ライブラリ名, バージョン, 依存種別, 取得元, 深さ, 要求元, ライセンス, 依存ライブラリ, 取得済みライブラリ, npm サイトの dependencies, 一致状態, 脆弱性, 脆弱性の詳細, リポジトリ, 備考</code>
-      （機能番号: ①①①①⑤⑤①②③④④⑥⑥①－。CSV のヘッダーには番号を付けていません）</li>
+    <li>列順: <code>ライブラリ名, バージョン, 依存種別, 取得元, 深さ, 要求元, 既出, 表示階層, 表示上の親, ライセンス, 依存ライブラリ, 取得済みライブラリ, npm サイトの dependencies, 一致状態, 脆弱性, 脆弱性の詳細, リポジトリ, 備考</code>
+      （機能番号: ①①①①⑤⑤⑤⑤⑤①②③④④⑥⑥①－。CSV のヘッダーには番号を付けていません）</li>
     <li>「脆弱性の詳細」は 1 セル内に <code>GHSA-ID [深刻度 CVSS] タイトル (影響: 範囲) URL</code> を <code>; </code> 区切り。⑥を使わない設定では「脆弱性」「脆弱性の詳細」は空</li>
     <li>「依存ライブラリ」「取得済みライブラリ」「npm サイトの dependencies」は 1 セル内に <code>; </code>（セミコロン＋空白）区切り</li>
     <li>「一致状態」は <code>全一致</code> / <code>不一致</code> / <code>サイト未取得</code>。npm サイトを取得しない設定では空</li>
+    <li>親子順のときは画面と同じ行（既出を含む）を出すため、行数がライブラリ数より多くなります。「既出」が空の行だけがライブラリの実体です</li>
     <li>取得失敗の行も残ります（ライセンス欄 <code>取得失敗</code>、備考に理由）</li>
   </ul>
-  <pre><code>ライブラリ名,バージョン,依存種別,取得元,深さ,要求元,ライセンス,依存ライブラリ,取得済みライブラリ,npm サイトの dependencies,一致状態,脆弱性,脆弱性の詳細,リポジトリ,備考
-axios,1.14.0,dependencies,両方,0,,MIT,follow-redirects@^1.15.11; form-data@^4.0.5; proxy-from-env@^2.1.0,follow-redirects@1.15.11; form-data@4.0.5; proxy-from-env@2.1.0,follow-redirects; form-data; proxy-from-env,全一致,"あり 1 件 (最高 high; high 1)","GHSA-q8qp-cvcw-x6jj [high 7.4] Axios has prototype pollution … (影響: >=1.0.0 <1.15.2) https://github.com/advisories/GHSA-q8qp-cvcw-x6jj",git+https://github.com/axios/axios.git,</code></pre>
+  <pre><code>ライブラリ名,バージョン,依存種別,取得元,深さ,要求元,既出,表示階層,表示上の親,ライセンス,依存ライブラリ,取得済みライブラリ,npm サイトの dependencies,一致状態,脆弱性,脆弱性の詳細,リポジトリ,備考
+axios,1.14.0,dependencies,両方,0,,,0,,MIT,follow-redirects@^1.15.11; form-data@^4.0.5; proxy-from-env@^2.1.0,follow-redirects@1.15.11; form-data@4.0.5; proxy-from-env@2.1.0,follow-redirects; form-data; proxy-from-env,全一致,"あり 1 件 (最高 high; high 1)","GHSA-q8qp-cvcw-x6jj [high 7.4] Axios has prototype pollution … (影響: >=1.0.0 <1.15.2) https://github.com/advisories/GHSA-q8qp-cvcw-x6jj",git+https://github.com/axios/axios.git,</code></pre>
 </section>
 
 </main>

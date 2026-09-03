@@ -24,6 +24,7 @@ const USAGE = `使い方: node src/cli.js [--project <dir>] [--out <file.csv>] [
   --recursive        依存ライブラリを再帰的にたどり、推移的依存もすべて行にする。先に再帰調査で件数を出し、確認してから本調査に入る
   --yes              --recursive の件数確認を省略して本調査に進む（バッチ用。端末でない場合は自動で進む）
   --order <o>        CSV の並び順: tree（既定。親子順＝直接依存の直下に子・孫）| depth（深さ順、同じ深さは名前順）
+  --no-duplicates    親子順のとき、複数の親から要求される行を最初の位置に 1 行だけ出す（既定は画面と同じく「既出」行も出す）
   --no-vulns         ⑥ 脆弱性チェック（npm の advisories API）を行わない（「脆弱性」「脆弱性の詳細」列は空になる）
   --no-site         npm サイト (npmjs.com) の Dependencies 欄を取得しない（「npm サイトの dependencies」「一致状態」列は空になる）
   --site-wait <a-b>  npm サイト取得ごとの待ち時間の範囲（秒、ランダム）。既定: ${DEFAULT_WAIT_MS.min / 1000}-${DEFAULT_WAIT_MS.max / 1000}。例: --site-wait 2-5、--site-wait 0 で待たない
@@ -60,6 +61,7 @@ export async function run(argv) {
       recursive: { type: 'boolean', default: false },
       yes: { type: 'boolean', default: false },
       order: { type: 'string', default: 'tree' },
+      'no-duplicates': { type: 'boolean', default: false },
       'no-vulns': { type: 'boolean', default: false },
       'no-site': { type: 'boolean', default: false },
       'site-wait': { type: 'string' },
@@ -139,9 +141,12 @@ export async function run(argv) {
     return 3;
   }
 
-  await writeFile(outPath, toCsv(CSV_HEADER, orderRows(result.rows, order).map(rowToCells)), 'utf8');
+  const expandDuplicates = !values['no-duplicates'];
+  const csvRows = orderRows(result.rows, order, { expandDuplicates });
+  await writeFile(outPath, toCsv(CSV_HEADER, csvRows.map(rowToCells)), 'utf8');
 
   const failed = result.rows.filter((r) => !r.ok).length;
+  const dupRows = csvRows.filter((r) => r.dup).length;
   const lines = [
     `完了: ${result.rows.length} 件 (取得失敗 ${failed} 件, レジストリ要求 ${result.stats.requests} 回, キャッシュ ${result.stats.cacheHits} 件)`,
   ];
@@ -160,7 +165,7 @@ export async function run(argv) {
         : `脆弱性チェック: 確認 ${v.checked} 件, 脆弱性あり ${v.withVulns} 件 (advisory 合計 ${v.advisories} 件, API 要求 ${v.requests} 回)`,
     );
   }
-  lines.push(`出力: ${outPath}`);
+  lines.push(`出力: ${outPath} (${csvRows.length} 行${dupRows ? `, うち既出 ${dupRows} 行` : ''})`);
   process.stderr.write(lines.join('\n') + '\n');
   return failed > 0 ? 2 : 0;
 }

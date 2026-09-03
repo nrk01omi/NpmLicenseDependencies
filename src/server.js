@@ -34,6 +34,8 @@ const state = {
   startedAt: null,
   finishedAt: null,
   savedAt: null,
+  savedRows: 0, // 最後に保存した CSV の行数（既出行を含む）
+  savedDuplicates: 0, // そのうち「既出」行の数
   stats: null,
   retrying: [], // 再取得中の行 index
   versionMode: 'installed', // installed | latest
@@ -44,6 +46,7 @@ const state = {
   recursive: false, // 依存ライブラリを再帰的にたどる
   listMode: 'union', // 行のリストの作り方: union（package.json ∪ package-lock.json）| packageJson（従来どおり）
   order: 'tree', // CSV の並び順: tree（親子順）| depth（深さ順）
+  csvDuplicates: true, // 親子順のとき、画面と同じく「既出」行も CSV に出す
   useVulns: true, // ⑥ 脆弱性チェック（npm advisories API）
   vulnStats: null, // ⑥ の集計 { checked, withVulns, advisories, error }
   source: 'analyze', // 結果の出どころ: analyze（解析）| csv（保存した CSV の読み込み。再取得は不可）
@@ -82,9 +85,12 @@ function failedCount() {
 async function saveCsv() {
   if (!state.out) throw new Error('出力先が指定されていません');
   await mkdir(path.dirname(state.out), { recursive: true });
-  await writeFile(state.out, toCsv(CSV_HEADER, orderRows(state.rows, state.order).filter(Boolean).map(rowToCells)), 'utf8');
+  const csvRows = orderRows(state.rows, state.order, { expandDuplicates: state.csvDuplicates }).filter(Boolean);
+  await writeFile(state.out, toCsv(CSV_HEADER, csvRows.map(rowToCells)), 'utf8');
+  state.savedRows = csvRows.length;
+  state.savedDuplicates = csvRows.filter((r) => r.dup).length;
   state.savedAt = new Date().toISOString();
-  log(`CSV を保存しました: ${state.out}`);
+  log(`CSV を保存しました: ${state.out} (${state.savedRows} 行${state.savedDuplicates ? `, うち既出 ${state.savedDuplicates} 行` : ''})`);
 }
 
 // ---------------------------------------------------------------- job control
@@ -110,6 +116,8 @@ async function startJob(params) {
     startedAt: new Date().toISOString(),
     finishedAt: null,
     savedAt: null,
+    savedRows: 0,
+    savedDuplicates: 0,
     stats: null,
     retrying: [],
     versionMode: params.versionMode === 'latest' ? 'latest' : 'installed',
@@ -120,6 +128,7 @@ async function startJob(params) {
     recursive: Boolean(params.recursive),
     listMode: normalizeListMode(params.listMode ?? (params.includeLock === false ? 'packageJson' : 'union')),
     order: normalizeOrder(params.order),
+    csvDuplicates: params.csvDuplicates !== false,
     useVulns: params.useVulns !== false,
     vulnStats: null,
     source: 'analyze',
@@ -465,6 +474,7 @@ async function loadCsvFile(filePath) {
   context = { projectInfo: null, deps: [], pendingResolve: null, recursiveResolve: null, askChain: Promise.resolve() };
   log(`CSV を読み込みました: ${resolved} (${parsed.rows.length} 件, 保存日時 ${info.mtime.toLocaleString('ja-JP')})`);
   if (parsed.missing.length) log(`この CSV に無い列: ${parsed.missing.join(', ')}（古い形式。ある列だけ表示します）`);
+  if (parsed.skippedDuplicates) log(`「既出」行 ${parsed.skippedDuplicates} 行は表示用の重複なので読み込みませんでした（表側で親子順に展開し直します）`);
   log('読み込んだ結果は「再取得」できません。更新するには同じプロジェクトで「実行」してください');
   broadcast();
 }
@@ -568,6 +578,7 @@ async function handle(req, res) {
     const body = await readJsonBody(req);
     if (body.out) state.out = path.resolve(String(body.out));
     if (body.order) state.order = normalizeOrder(body.order);
+    if (body.csvDuplicates != null) state.csvDuplicates = body.csvDuplicates !== false;
     if (state.rows.length === 0) throw new HttpError(400, '保存する結果がありません');
     await saveCsv();
     broadcast();
